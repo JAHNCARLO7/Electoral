@@ -1,0 +1,21 @@
+.login-container {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	min-height: 100vh;
+	background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+	padding: 32px;
+}
+
+.login-title {
+	font-size: 2.5rem;
+	font-weight: bold;
+	color: #333;
+	margin-bottom: 32px;
+	text-shadow: 2px 2px 8px #fff6, 0 2px 8px #f8bbd0;
+	letter-spacing: 2px;
+	background: linear-gradient(90deg, #ff9a9e, #fad0c4);
+	-webkit-background-clip: text;
+	-webkit-text-fill-color: transparent;
+}
