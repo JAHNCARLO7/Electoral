@@ -16,6 +16,5 @@
 	text-shadow: 2px 2px 8px #fff6, 0 2px 8px #f8bbd0;
 	letter-spacing: 2px;
 	background: linear-gradient(90deg, #ff9a9e, #fad0c4);
-	-webkit-background-clip: text;
 	-webkit-text-fill-color: transparent;
 }
