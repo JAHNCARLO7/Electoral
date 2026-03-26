@@ -7,6 +7,7 @@ export default function Login() {
 		<div className="login-container">
 			<h1 className="login-title">¡Bienvenido!</h1>
 			{/* Aquí puedes agregar el formulario de login */}
+			<button className="login-btn">Ingresar</button>
 		</div>
 	);
 }

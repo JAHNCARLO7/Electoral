@@ -18,3 +18,22 @@
 	background: linear-gradient(90deg, #ff9a9e, #fad0c4);
 	-webkit-text-fill-color: transparent;
 }
+
+.login-btn {
+	padding: 12px 36px;
+	font-size: 1.2rem;
+	font-weight: 600;
+	color: #fff;
+	background: linear-gradient(90deg, #ff9a9e, #fad0c4);
+	border: none;
+	border-radius: 30px;
+	box-shadow: 0 4px 16px #fad0c488;
+	cursor: pointer;
+	transition: transform 0.1s, box-shadow 0.2s;
+	margin-top: 16px;
+}
+.login-btn:hover {
+	transform: translateY(-2px) scale(1.04);
+	box-shadow: 0 8px 24px #ff9a9e55;
+	opacity: 0.95;
+}
