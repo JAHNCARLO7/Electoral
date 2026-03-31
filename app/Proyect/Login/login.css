@@ -1,39 +1,232 @@
-.login-container {
+.root {
+	display: flex;
+	flex-direction: column;
+	min-height: 100vh;
+	background: #fff;
+	justify-content: center;
+	align-items: center;
+}
+
+.accentBar {
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	height: 4px;
+	background: #C8922A;
+}
+
+.accentBarBottom {
+	position: absolute;
+	bottom: 0;
+	left: 0;
+	right: 0;
+	height: 4px;
+	background: #0A1628;
+}
+
+.headerContainer {
 	display: flex;
 	flex-direction: column;
 	align-items: center;
+	margin-bottom: 48px;
+	padding: 0 24px;
+}
+
+.shieldWrapper {
+	margin-bottom: 20px;
+}
+
+.shieldOuter {
+	width: 88px;
+	height: 88px;
+	border-radius: 44px;
+	background: #0A1628;
+	display: flex;
 	justify-content: center;
-	min-height: 100vh;
-	background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
-	padding: 32px;
+	align-items: center;
+	box-shadow: 0 8px 16px rgba(10,22,40,0.25);
 }
 
-.login-title {
-	font-size: 2.5rem;
-	font-weight: bold;
-	color: #333;
-	margin-bottom: 32px;
-	text-shadow: 2px 2px 8px #fff6, 0 2px 8px #f8bbd0;
+.shieldInner {
+	width: 68px;
+	height: 68px;
+	border-radius: 34px;
+	background: #1A3A6B;
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	border: 2px solid #C8922A;
+}
+
+.shieldEmoji {
+	font-size: 30px;
+}
+
+.appTitle {
+	font-family: serif;
+	font-size: 34px;
+	font-weight: 700;
+	color: #0A1628;
+	letter-spacing: 8px;
+	margin-bottom: 6px;
+}
+
+.appSubtitle {
+	font-family: sans-serif;
+	font-size: 12px;
+	color: #7A8399;
+	letter-spacing: 2.5px;
+	text-transform: uppercase;
+	margin-bottom: 20px;
+}
+
+.dividerRow {
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+	width: 180px;
+}
+
+.dividerLine {
+	flex: 1;
+	height: 1px;
+	background: #E0E4ED;
+}
+
+.dividerDot {
+	width: 6px;
+	height: 6px;
+	border-radius: 3px;
+	background: #C8922A;
+	margin: 0 8px;
+}
+
+.formContainer {
+	width: 100%;
+	max-width: 380px;
+	background: #fff;
+	border-radius: 20px;
+	padding: 36px 28px;
+	box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+	border: 1px solid #EEF0F7;
+}
+
+.inputWrapper {
+	margin-bottom: 4px;
+}
+
+.inputLabel {
+	font-family: sans-serif;
+	font-size: 10px;
+	font-weight: 700;
+	color: #0A1628;
 	letter-spacing: 2px;
-	background: linear-gradient(90deg, #ff9a9e, #fad0c4);
-	-webkit-text-fill-color: transparent;
+	margin-bottom: 10px;
 }
 
-.login-btn {
-	padding: 12px 36px;
-	font-size: 1.2rem;
-	font-weight: 600;
-	color: #fff;
-	background: linear-gradient(90deg, #ff9a9e, #fad0c4);
-	border: none;
-	border-radius: 30px;
-	box-shadow: 0 4px 16px #fad0c488;
-	cursor: pointer;
-	transition: transform 0.1s, box-shadow 0.2s;
-	margin-top: 16px;
+.inputRow {
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+	padding-bottom: 8px;
 }
-.login-btn:hover {
-	transform: translateY(-2px) scale(1.04);
-	box-shadow: 0 8px 24px #ff9a9e55;
-	opacity: 0.95;
+
+.inputIcon {
+	font-size: 16px;
+	margin-right: 10px;
+	opacity: 0.6;
+}
+
+.eyeIcon {
+	font-size: 16px;
+	opacity: 0.5;
+	padding-left: 8px;
+	cursor: pointer;
+}
+
+.input {
+	flex: 1;
+	font-family: sans-serif;
+	font-size: 15px;
+	color: #0A1628;
+	padding: 0;
+	border: none;
+	background: none;
+	outline: none;
+}
+
+.inputUnderline {
+	height: 1.5px;
+	background: #E0E4ED;
+	border-radius: 1px;
+}
+
+.loginButton {
+	margin-top: 40px;
+	background: #0A1628;
+	border-radius: 12px;
+	padding: 16px 0;
+	display: flex;
+	flex-direction: row;
+	justify-content: center;
+	align-items: center;
+	box-shadow: 0 6px 12px rgba(10,22,40,0.3);
+	color: #fff;
+	font-weight: 700;
+	font-size: 14px;
+	letter-spacing: 3px;
+	cursor: pointer;
+	border: none;
+	transition: opacity 0.2s;
+}
+
+.loginButton:disabled {
+	opacity: 0.65;
+	cursor: not-allowed;
+}
+
+.loginButtonArrow {
+	color: #C8922A;
+	font-size: 18px;
+	margin-left: 10px;
+	font-weight: 700;
+}
+
+.securityNote {
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+	justify-content: center;
+	margin-top: 20px;
+}
+
+.securityDot {
+	font-size: 6px;
+	color: #C8922A;
+	margin-right: 6px;
+}
+
+.securityText {
+	font-family: sans-serif;
+	font-size: 10px;
+	color: #9EA8BB;
+	letter-spacing: 0.5px;
+}
+
+.footer {
+	position: absolute;
+	bottom: 22px;
+	left: 0;
+	right: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.footerText {
+	font-family: sans-serif;
+	font-size: 10px;
+	color: #BCC2CE;
+	letter-spacing: 1px;
 }
