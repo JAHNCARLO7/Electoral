@@ -1,3 +1,9 @@
+// Endpoints para gestión de usuarios (solo admin)
+const express = require('express');
+const router = express.Router();
+const pool = require('./db');
+const bcrypt = require('bcrypt');
+
 // Eliminar usuario (solo admin)
 router.delete('/:id', async (req, res) => {
   const { id } = req.params;
@@ -11,12 +17,6 @@ router.delete('/:id', async (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 });
-
-// Endpoints para gestión de usuarios (solo admin)
-const express = require('express');
-const router = express.Router();
-const pool = require('./db');
-const bcrypt = require('bcrypt');
 
 // Obtener usuario por ID
 router.get('/:id', async (req, res) => {
