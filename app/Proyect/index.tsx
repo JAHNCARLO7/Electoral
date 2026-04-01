@@ -1,10 +1,6 @@
-import { router } from 'expo-router';
-import { useEffect } from 'react';
+import Login from './Login/login';
 
 export default function HomeScreen() {
-  useEffect(() => {
-    router.replace('/Proyect/Login/login');
-  }, []);
-  return null;
+  return <Login />;
 }
 

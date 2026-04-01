@@ -19,7 +19,7 @@ export default function RootLayout() {
       <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
         <Stack>
           <Stack.Screen name="(Proyect)" options={{ headerShown: false }} />
-          <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
+          {/* Modal eliminado */}
         </Stack>
         <StatusBar style="auto" />
       </ThemeProvider>
