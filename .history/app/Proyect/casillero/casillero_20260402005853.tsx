@@ -4,7 +4,6 @@ import {
   FlatList,
   Modal, StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View
 } from 'react-native';
@@ -12,105 +11,64 @@ import { useUser } from '../../../context/UserContext';
 
 const API_URL = 'http://10.0.2.2:8080/api/ciudadanos';
 
-type Seccion = {
-  seccion: string;
-};
-
-type Ciudadano = {
-  id: number;
-  nombre: string;
-  paterno: string;
-  materno: string;
-};
-
 export default function CasilleroScreen() {
   const { user } = useUser();
 
-  const [secciones, setSecciones] = useState<Seccion[]>([]);
-  const [seccionesFiltradas, setSeccionesFiltradas] = useState<Seccion[]>([]);
-  const [busquedaSeccion, setBusquedaSeccion] = useState<string>('');
+  const [secciones, setSecciones] = useState([]);
+  const [seccionSeleccionada, setSeccionSeleccionada] = useState(null);
+  const [ciudadanos, setCiudadanos] = useState([]);
+  const [ciudadanoAVotar, setCiudadanoAVotar] = useState(null);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [cargando, setCargando] = useState(false);
 
-  const [seccionSeleccionada, setSeccionSeleccionada] = useState<string | null>(null);
-  const [ciudadanos, setCiudadanos] = useState<Ciudadano[]>([]);
-  const [ciudadanosFiltrados, setCiudadanosFiltrados] = useState<Ciudadano[]>([]);
-  const [busquedaCiudadano, setBusquedaCiudadano] = useState<string>('');
-
-  const [ciudadanoAVotar, setCiudadanoAVotar] = useState<Ciudadano | null>(null);
-  const [modalVisible, setModalVisible] = useState<boolean>(false);
-  const [cargando, setCargando] = useState<boolean>(false);
-
+  // Cargar secciones al iniciar
   useEffect(() => {
     cargarSecciones();
   }, []);
 
-  const cargarSecciones = async (): Promise<void> => {
+  const cargarSecciones = async () => {
     setCargando(true);
     try {
       const respuesta = await fetch(`${API_URL}/secciones`);
-      const data: Seccion[] = await respuesta.json();
+      const data = await respuesta.json();
       setSecciones(data);
-      setSeccionesFiltradas(data);
     } catch (error) {
       Alert.alert('Error', 'No se pudieron cargar las secciones');
     }
     setCargando(false);
   };
 
-  const buscarSeccion = (texto: string): void => {
-    setBusquedaSeccion(texto);
-    const filtradas = secciones.filter(s =>
-      s.seccion.toLowerCase().includes(texto.toLowerCase())
-    );
-    setSeccionesFiltradas(filtradas);
-  };
-
-  const cargarCiudadanos = async (seccion: string): Promise<void> => {
+  const cargarCiudadanos = async (seccion) => {
     setCargando(true);
     setSeccionSeleccionada(seccion);
-    setBusquedaCiudadano('');
     try {
       const respuesta = await fetch(`${API_URL}/seccion/${seccion}`);
-      const data: Ciudadano[] = await respuesta.json();
+      const data = await respuesta.json();
       setCiudadanos(data);
-      setCiudadanosFiltrados(data);
     } catch (error) {
       Alert.alert('Error', 'No se pudieron cargar los ciudadanos');
     }
     setCargando(false);
   };
 
-  const buscarCiudadano = (texto: string): void => {
-    setBusquedaCiudadano(texto);
-    const filtrados = ciudadanos.filter(c => {
-      const nombreCompleto = `${c.nombre} ${c.paterno} ${c.materno}`.toLowerCase();
-      return nombreCompleto.includes(texto.toLowerCase());
-    });
-    setCiudadanosFiltrados(filtrados);
-  };
-
-  const abrirConfirmacion = (ciudadano: Ciudadano): void => {
+  const abrirConfirmacion = (ciudadano) => {
     setCiudadanoAVotar(ciudadano);
     setModalVisible(true);
   };
 
-  const confirmarVoto = async (): Promise<void> => {
-    if (!ciudadanoAVotar) return;
+  const confirmarVoto = async () => {
     try {
       await fetch(`${API_URL}/votar/${ciudadanoAVotar.id}`, { method: 'PUT' });
       setModalVisible(false);
-      const nuevaLista = ciudadanos.filter(c => c.id !== ciudadanoAVotar.id);
-      setCiudadanos(nuevaLista);
-      setCiudadanosFiltrados(nuevaLista.filter(c => {
-        const nombreCompleto = `${c.nombre} ${c.paterno} ${c.materno}`.toLowerCase();
-        return nombreCompleto.includes(busquedaCiudadano.toLowerCase());
-      }));
+      // Quitar al ciudadano de la lista
+      setCiudadanos(prev => prev.filter(c => c.id !== ciudadanoAVotar.id));
       setCiudadanoAVotar(null);
     } catch (error) {
       Alert.alert('Error', 'No se pudo registrar el voto');
     }
   };
 
-  const cancelarVoto = (): void => {
+  const cancelarVoto = () => {
     setModalVisible(false);
     setCiudadanoAVotar(null);
   };
@@ -121,22 +79,11 @@ export default function CasilleroScreen() {
       <View style={styles.contenedor}>
         <Text style={styles.titulo}>Bienvenido, {user?.nombre}</Text>
         <Text style={styles.subtitulo}>Selecciona una sección</Text>
-
-        <TextInput
-          style={styles.buscador}
-          placeholder="Buscar sección..."
-          placeholderTextColor="#999"
-          value={busquedaSeccion}
-          onChangeText={buscarSeccion}
-        />
-
         {cargando ? (
           <ActivityIndicator size="large" color="#1a3a5c" />
-        ) : seccionesFiltradas.length === 0 ? (
-          <Text style={styles.textoVacio}>No se encontró esa sección</Text>
         ) : (
           <FlatList
-            data={seccionesFiltradas}
+            data={secciones}
             keyExtractor={(item) => item.seccion}
             renderItem={({ item }) => (
               <TouchableOpacity
@@ -152,7 +99,7 @@ export default function CasilleroScreen() {
     );
   }
 
-  // Vista: Lista de ciudadanos
+  // Vista: Lista de ciudadanos de la sección
   return (
     <View style={styles.contenedor}>
       <TouchableOpacity onPress={() => setSeccionSeleccionada(null)} style={styles.botonRegresar}>
@@ -161,23 +108,13 @@ export default function CasilleroScreen() {
       <Text style={styles.titulo}>Sección {seccionSeleccionada}</Text>
       <Text style={styles.subtitulo}>Toca un nombre para registrar voto</Text>
 
-      <TextInput
-        style={styles.buscador}
-        placeholder="Buscar ciudadano..."
-        placeholderTextColor="#999"
-        value={busquedaCiudadano}
-        onChangeText={buscarCiudadano}
-      />
-
       {cargando ? (
         <ActivityIndicator size="large" color="#1a3a5c" />
-      ) : ciudadanosFiltrados.length === 0 ? (
-        <Text style={styles.textoVacio}>
-          {busquedaCiudadano ? 'No se encontró ese ciudadano' : 'Todos han votado en esta sección ✅'}
-        </Text>
+      ) : ciudadanos.length === 0 ? (
+        <Text style={styles.textoVacio}>Todos han votado en esta sección ✅</Text>
       ) : (
         <FlatList
-          data={ciudadanosFiltrados}
+          data={ciudadanos}
           keyExtractor={(item) => item.id.toString()}
           renderItem={({ item }) => (
             <TouchableOpacity
@@ -192,6 +129,7 @@ export default function CasilleroScreen() {
         />
       )}
 
+      {/* Modal de confirmación */}
       <Modal transparent visible={modalVisible} animationType="fade">
         <View style={styles.fondoModal}>
           <View style={styles.modal}>
@@ -221,17 +159,7 @@ export default function CasilleroScreen() {
 const styles = StyleSheet.create({
   contenedor: { flex: 1, backgroundColor: '#fff', padding: 16 },
   titulo: { fontSize: 22, fontWeight: 'bold', color: '#1a3a5c', marginBottom: 4 },
-  subtitulo: { fontSize: 14, color: '#666', marginBottom: 12 },
-  buscador: {
-    backgroundColor: '#f0f4f8',
-    borderRadius: 10,
-    padding: 12,
-    fontSize: 15,
-    color: '#333',
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#d0d9e3'
-  },
+  subtitulo: { fontSize: 14, color: '#666', marginBottom: 16 },
   tarjeta: {
     backgroundColor: '#f0f4f8', padding: 16, borderRadius: 10,
     marginBottom: 10, borderLeftWidth: 4, borderLeftColor: '#1a3a5c'
