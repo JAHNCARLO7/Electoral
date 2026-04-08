@@ -2,8 +2,8 @@ import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-	ActivityIndicator, Alert, Animated, Platform, RefreshControl,
-	ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
+  ActivityIndicator, Alert, Animated, Platform, RefreshControl,
+  ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import { useUser } from '../../../context/UserContext';
 import { API_URL, useAuthFetch } from '../../../hooks/useAuthFetch';
@@ -155,7 +155,7 @@ const MovilizadorScreen = () => {
         <View style={st.headerRight}>
           {sendingLocation && (
             <View style={st.gpsBadge}>
-              <Text style={st.gpsText}>GPS</Text>
+              <Text style={st.gpsText}></Text>
             </View>
           )}
           <View style={st.statBadge}>
