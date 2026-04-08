@@ -1,21 +1,20 @@
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
-  Animated,
-  Dimensions,
-  Platform,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Animated,
+    Dimensions,
+    Platform,
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { useUser } from '../../../context/UserContext';
-
-const API_URL = Platform.OS === 'android' ? 'http://10.0.2.2:8080/api' : 'http://localhost:8080/api';
+import { API_URL, useAuthFetch } from '../../../hooks/useAuthFetch';
 const { width: SCREEN_W } = Dimensions.get('window');
 const CARD_PAD = 16;
 
@@ -230,8 +229,9 @@ const SparkBars = React.memo(({ values, color, height = 32 }: { values: number[]
 /* ---------- PANTALLA PRINCIPAL ---------- */
 
 export default function RPScreen() {
-  const { user, setUser } = useUser();
+  const { user, setUser, setToken } = useUser();
   const router = useRouter();
+  const authFetch = useAuthFetch();
   const [movilizadores, setMovilizadores] = useState<Movilizador[]>([]);
   const [estadisticas, setEstadisticas] = useState<EstadisticaVotos[]>([]);
   const [loading, setLoading] = useState(true);
@@ -247,15 +247,15 @@ export default function RPScreen() {
   const fetchData = useCallback(async () => {
     try {
       const [movRes, votosRes] = await Promise.all([
-        fetch(API_URL + '/movilizadores/estado'),
-        fetch(API_URL + '/ciudadanos/estadisticas/votos'),
+        authFetch(API_URL + '/movilizadores/estado'),
+        authFetch(API_URL + '/ciudadanos/estadisticas/votos'),
       ]);
       const movData = await movRes.json();
       const votosData = await votosRes.json();
       if (Array.isArray(movData)) setMovilizadores(movData);
       if (Array.isArray(votosData)) setEstadisticas(votosData);
     } catch (err) { console.warn('Error al cargar datos RP:', err); }
-  }, []);
+  }, [authFetch]);
 
   const loadInitial = useCallback(async () => { setLoading(true); await fetchData(); setLoading(false); }, [fetchData]);
   const onRefresh = useCallback(async () => { setRefreshing(true); await fetchData(); setRefreshing(false); }, [fetchData]);
@@ -266,12 +266,12 @@ export default function RPScreen() {
     if (ciudadanosMov[movId]) return;
     setLoadingCiudadanos(movId);
     try {
-      const res = await fetch(API_URL + '/movilizadores/detalle-ciudadanos/' + movId);
+      const res = await authFetch(API_URL + '/movilizadores/detalle-ciudadanos/' + movId);
       const data = await res.json();
       if (Array.isArray(data)) setCiudadanosMov(prev => ({ ...prev, [movId]: data }));
     } catch (err) { console.warn('Error al cargar ciudadanos:', err); }
     setLoadingCiudadanos(null);
-  }, [expandedMov, ciudadanosMov]);
+  }, [expandedMov, ciudadanosMov, authFetch]);
 
   useEffect(() => {
     loadInitial();
@@ -280,6 +280,7 @@ export default function RPScreen() {
   }, []);
 
   const handleLogout = useCallback(() => {
+    setToken(null);
     setUser(null);
     setTimeout(() => router.replace('/Proyect/Login/login'), 250);
   }, []);

@@ -1,20 +1,22 @@
-// Endpoint de login seguro con bcrypt y validación de activo
+// Endpoint de login seguro con bcrypt
 const express = require('express');
 const router = express.Router();
 const pool = require('./db');
 const bcrypt = require('bcrypt');
+const { generateToken } = require('./authMiddleware');
 
 
 // POST /login { usuario, password }
-// MODO PRUEBA: compara la contraseña en texto plano (INSEGURO, SOLO PARA DESARROLLO)
 router.post('/login', async (req, res) => {
-  console.log('Llega al login', req.body);
-  const { usuario, password } = req.body;
+  const usuario = (req.body.usuario || '').trim();
+  const password = req.body.password || '';
   if (!usuario || !password) {
     return res.status(400).json({ error: 'Usuario y contraseña requeridos' });
   }
+  if (usuario.length > 50 || password.length > 100) {
+    return res.status(400).json({ error: 'Datos inválidos' });
+  }
   try {
-    // Buscar usuario activo
     const [rows] = await pool.execute(
       'SELECT id, nombre, usuario, password_hash, rol, activo FROM usuarios WHERE usuario = ? LIMIT 1',
       [usuario]
@@ -26,28 +28,19 @@ router.post('/login', async (req, res) => {
     if (!user.activo) {
       return res.status(403).json({ success: false, error: 'Usuario inactivo' });
     }
-    // 1. Intenta comparar con bcrypt
-    let match = false;
-    try {
-      match = await bcrypt.compare(password, user.password_hash);
-    } catch (e) {
-      match = false;
-    }
 
-    // 2. Si no coincide, intenta comparar en texto plano
-    if (!match && password === user.password_hash) {
-      // Migrar: encripta y actualiza la contraseña
-      const hashedPassword = await bcrypt.hash(password, 10);
-      await pool.execute('UPDATE usuarios SET password_hash = ? WHERE id = ?', [hashedPassword, user.id]);
-      match = true;
-    }
-
+    const match = await bcrypt.compare(password, user.password_hash);
     if (!match) {
       return res.status(401).json({ success: false, error: 'Credenciales incorrectas' });
     }
-    // Login exitoso, devolver datos relevantes
+
+    // Actualizar ultimo_login
+    await pool.execute('UPDATE usuarios SET ultimo_login = NOW() WHERE id = ?', [user.id]);
+
+    const token = generateToken(user);
     res.json({
       success: true,
+      token,
       user: {
         id: user.id,
         nombre: user.nombre,
@@ -56,7 +49,8 @@ router.post('/login', async (req, res) => {
       },
     });
   } catch (err) {
-    res.status(500).json({ error: 'Error en el servidor', details: err.message });
+    console.error('Login error:', err);
+    res.status(500).json({ error: 'Error en el servidor' });
   }
 });
 

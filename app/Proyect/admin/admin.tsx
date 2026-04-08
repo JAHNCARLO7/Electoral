@@ -1,13 +1,12 @@
 import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     FlatList, Modal, Platform,
     ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View
 } from 'react-native';
 import { useUser } from '../../../context/UserContext';
-
-const API_URL = Platform.OS === 'android' ? 'http://10.0.2.2:8080/api' : 'http://localhost:8080/api';
+import { API_URL, useAuthFetch } from '../../../hooks/useAuthFetch';
 
 /* ---------- PALETA CORPORATIVA ---------- */
 const C = {
@@ -41,8 +40,9 @@ type Movilizador = { id: number; nombre: string };
 type DeleteState = { visible: boolean; item: any; type: 'user' | 'ciudadano' | null };
 
 export default function AdminScreen() {
-  const { user, setUser } = useUser();
+  const { user, setUser, setToken } = useUser();
   const router = useRouter();
+  const authFetch = useAuthFetch();
 
   // Tab state
   const [tab, setTab] = useState<'usuarios' | 'ciudadanos'>('usuarios');
@@ -64,6 +64,10 @@ export default function AdminScreen() {
   const [movilizadores, setMovilizadores] = useState<Movilizador[]>([]);
   const [loadingCiudadanos, setLoadingCiudadanos] = useState(true);
   const [searchCiudadanos, setSearchCiudadanos] = useState('');
+  const [ciudPage, setCiudPage] = useState(1);
+  const [ciudTotal, setCiudTotal] = useState(0);
+  const [ciudTotalPages, setCiudTotalPages] = useState(1);
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [ciudForm, setCiudForm] = useState({ nombre: '', paterno: '', materno: '', calle: '', no: '', colonia: '', seccion: '', cel: '', movilizador_id: '' });
   const [ciudModalVisible, setCiudModalVisible] = useState(false);
   const [editCiudModalVisible, setEditCiudModalVisible] = useState(false);
@@ -73,7 +77,7 @@ export default function AdminScreen() {
   const fetchUsers = async () => {
     setLoadingUsers(true); setError(null);
     try {
-      const res = await fetch(API_URL + '/users');
+      const res = await authFetch(API_URL + '/users');
       const data = await res.json();
       if (data.success) setUsers(data.users);
     } catch (e) { setError('Error al cargar usuarios'); }
@@ -84,7 +88,7 @@ export default function AdminScreen() {
     if (!form.usuario || !form.password || !form.nombre || !form.rol) return;
     setSaving(true); setError(null);
     try {
-      const res = await fetch(API_URL + '/users', {
+      const res = await authFetch(API_URL + '/users', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form),
       });
       if (!res.ok) { setError('Error al guardar usuario'); setSaving(false); return; }
@@ -98,7 +102,7 @@ export default function AdminScreen() {
     setSaving(true); setError(null);
     try {
       const { nombre, usuario, password, rol, activo } = editForm;
-      const res = await fetch(API_URL + '/users/' + editForm.id, {
+      const res = await authFetch(API_URL + '/users/' + editForm.id, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ nombre, usuario, password, rol, activo }),
       });
@@ -115,7 +119,7 @@ export default function AdminScreen() {
       const url = deleteState.type === 'user'
         ? API_URL + '/users/' + deleteState.item.id
         : API_URL + '/ciudadanos/' + deleteState.item.id;
-      const res = await fetch(url, { method: 'DELETE' });
+      const res = await authFetch(url, { method: 'DELETE' });
       if (!res.ok) { setError('Error al eliminar'); setSaving(false); return; }
       setDeleteState({ visible: false, item: null, type: null });
       if (deleteState.type === 'user') fetchUsers(); else fetchCiudadanos();
@@ -124,16 +128,22 @@ export default function AdminScreen() {
   };
 
   // ========== CIUDADANOS FUNCTIONS ==========
-  const fetchCiudadanos = async () => {
+  const fetchCiudadanos = async (page = 1, search = '') => {
     setLoadingCiudadanos(true);
     try {
+      const params = `?page=${page}&limit=100&search=${encodeURIComponent(search)}`;
       const [cRes, mRes] = await Promise.all([
-        fetch(API_URL + '/ciudadanos/todos'),
-        fetch(API_URL + '/ciudadanos/movilizadores-disponibles'),
+        authFetch(API_URL + '/ciudadanos/todos' + params),
+        authFetch(API_URL + '/ciudadanos/movilizadores-disponibles'),
       ]);
       const cData = await cRes.json();
       const mData = await mRes.json();
-      if (Array.isArray(cData)) setCiudadanos(cData);
+      if (cData.rows) {
+        setCiudadanos(cData.rows);
+        setCiudTotal(cData.total);
+        setCiudPage(cData.page);
+        setCiudTotalPages(cData.totalPages);
+      }
       if (Array.isArray(mData)) setMovilizadores(mData);
     } catch (e) { setError('Error al cargar ciudadanos'); }
     setLoadingCiudadanos(false);
@@ -147,7 +157,7 @@ export default function AdminScreen() {
     setSaving(true); setError(null);
     try {
       const body = { ...ciudForm, movilizador_id: ciudForm.movilizador_id ? Number(ciudForm.movilizador_id) : null };
-      const res = await fetch(API_URL + '/ciudadanos', {
+      const res = await authFetch(API_URL + '/ciudadanos', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
       });
       if (!res.ok) { setError('Error al agregar ciudadano'); setSaving(false); return; }
@@ -163,7 +173,7 @@ export default function AdminScreen() {
     setSaving(true); setError(null);
     try {
       const body = { ...editCiudForm, movilizador_id: editCiudForm.movilizador_id ? Number(editCiudForm.movilizador_id) : null };
-      const res = await fetch(API_URL + '/ciudadanos/' + editCiudForm.id, {
+      const res = await authFetch(API_URL + '/ciudadanos/' + editCiudForm.id, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
       });
       if (!res.ok) { setError('Error al editar ciudadano'); setSaving(false); return; }
@@ -172,9 +182,19 @@ export default function AdminScreen() {
     setSaving(false);
   };
 
+  const handleSearchCiudadanos = useCallback((text: string) => {
+    setSearchCiudadanos(text);
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    searchTimerRef.current = setTimeout(() => {
+      setCiudPage(1);
+      fetchCiudadanos(1, text);
+    }, 400);
+  }, []);
+
   useEffect(() => { fetchUsers(); fetchCiudadanos(); }, []);
 
   const handleLogout = () => {
+    setToken(null);
     setUser(null);
     setTimeout(() => router.replace('/Proyect/Login/login'), 250);
   };
@@ -182,11 +202,6 @@ export default function AdminScreen() {
   const filteredUsers = users.filter(u =>
     u.nombre.toLowerCase().includes(searchUsers.toLowerCase()) ||
     u.usuario.toLowerCase().includes(searchUsers.toLowerCase())
-  );
-
-  const filteredCiudadanos = ciudadanos.filter(c =>
-    (c.nombre + ' ' + c.paterno + ' ' + c.materno).toLowerCase().includes(searchCiudadanos.toLowerCase()) ||
-    c.seccion.includes(searchCiudadanos.trim())
   );
 
   // ========== RENDER HELPERS ==========
@@ -282,7 +297,7 @@ export default function AdminScreen() {
         <View style={{ flex: 1, paddingHorizontal: 16, paddingTop: 14 }}>
           <View style={st.statsRow}>
             <View style={[st.statCard, { backgroundColor: C.primaryLight }]}>
-              <Text style={[st.statNum, { color: C.primary }]}>{ciudadanos.length}</Text>
+              <Text style={[st.statNum, { color: C.primary }]}>{ciudTotal}</Text>
               <Text style={st.statLabel}>Total</Text>
             </View>
             <View style={[st.statCard, { backgroundColor: C.successLight }]}>
@@ -294,12 +309,25 @@ export default function AdminScreen() {
               <Text style={st.statLabel}>Sin asignar</Text>
             </View>
           </View>
-          <TextInput style={st.searchInput} placeholder="Buscar nombre o sección..." placeholderTextColor={C.textTertiary}
-            value={searchCiudadanos} onChangeText={setSearchCiudadanos} />
+          <TextInput style={st.searchInput} placeholder="Buscar nombre o sección (servidor)..." placeholderTextColor={C.textTertiary}
+            value={searchCiudadanos} onChangeText={handleSearchCiudadanos} />
           {loadingCiudadanos ? <ActivityIndicator size="large" color={C.primary} style={{ marginTop: 40 }} /> : (
-            <FlatList data={filteredCiudadanos} keyExtractor={item => item.id.toString()}
+            <FlatList data={ciudadanos} keyExtractor={item => item.id.toString()}
               showsVerticalScrollIndicator={false}
               contentContainerStyle={{ paddingBottom: 100 }}
+              ListFooterComponent={ciudTotalPages > 1 ? (
+                <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 12, paddingVertical: 12 }}>
+                  <TouchableOpacity disabled={ciudPage <= 1} onPress={() => { const p = ciudPage - 1; setCiudPage(p); fetchCiudadanos(p, searchCiudadanos); }}
+                    style={[st.pageBtn, ciudPage <= 1 && { opacity: 0.3 }]}>
+                    <Text style={st.pageBtnText}>← Anterior</Text>
+                  </TouchableOpacity>
+                  <Text style={{ fontSize: 13, fontWeight: '800', color: C.textPrimary }}>Pág {ciudPage}/{ciudTotalPages}</Text>
+                  <TouchableOpacity disabled={ciudPage >= ciudTotalPages} onPress={() => { const p = ciudPage + 1; setCiudPage(p); fetchCiudadanos(p, searchCiudadanos); }}
+                    style={[st.pageBtn, ciudPage >= ciudTotalPages && { opacity: 0.3 }]}>
+                    <Text style={st.pageBtnText}>Siguiente →</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : null}
               renderItem={({ item }) => (
                 <View style={st.card}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
@@ -561,4 +589,9 @@ const st = StyleSheet.create({
   cancelBtnText: { color: C.textSecondary, fontWeight: '800', fontSize: 13 },
   saveBtn: { flex: 1, borderRadius: 10, paddingVertical: 12, alignItems: 'center', backgroundColor: C.primary },
   saveBtnText: { color: C.white, fontWeight: '800', fontSize: 13 },
+  pageBtn: {
+    backgroundColor: C.primaryLight, borderRadius: 8, paddingVertical: 8, paddingHorizontal: 16,
+    borderWidth: 1, borderColor: C.primary,
+  },
+  pageBtnText: { color: C.primary, fontWeight: '800', fontSize: 12 },
 });

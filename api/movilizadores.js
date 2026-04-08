@@ -1,19 +1,34 @@
-console.log('movilizadores.js cargado');
 // Endpoints para Movilizadores: lista de ciudadanos, visitas y geolocalización
 const express = require('express');
 const router = express.Router();
 const db = require('./db');
+const { requireRole } = require('./authMiddleware');
+
+// Helper: validar ID entero positivo
+function parseId(val) {
+  const id = parseInt(val, 10);
+  return (!isNaN(id) && id > 0) ? id : null;
+}
+
+// Cache para estado de movilizadores (query pesada con subqueries)
+let estadoCache = { data: null, ts: 0 };
+const ESTADO_CACHE_TTL = 15_000; // 15 segundos
 
 // Obtener ciudadanos asignados a un movilizador que no han votado
 router.get('/ciudadanos/:movilizadorId', async (req, res) => {
   try {
-    const { movilizadorId } = req.params;
-    console.log('Llamada a /ciudadanos/:movilizadorId con id:', movilizadorId);
-    const [rows] = await db.query(
+    const movilizadorId = parseId(req.params.movilizadorId);
+    if (!movilizadorId) return res.status(400).json({ error: 'ID inválido' });
+
+    // Un movilizador solo puede ver sus propios ciudadanos (admin puede ver todos)
+    if (req.user.rol === 'movilizador' && req.user.id !== movilizadorId) {
+      return res.status(403).json({ error: 'Sin permisos para ver ciudadanos de otro movilizador' });
+    }
+
+    const [rows] = await db.execute(
       'SELECT id, nombre, paterno, materno, calle, no, colonia, seccion, cel, visitas FROM ciudadanos WHERE movilizador_id = ? AND status_voto = "pendiente" AND deleted = 0',
       [movilizadorId]
     );
-    console.log('Resultados de la consulta:', rows);
     res.json(rows);
   } catch (error) {
     console.error('Error en endpoint ciudadanos:', error);
@@ -22,10 +37,11 @@ router.get('/ciudadanos/:movilizadorId', async (req, res) => {
 });
 
 // Obtener todos los ciudadanos asignados a un movilizador CON estado de visitas (para RP)
-router.get('/detalle-ciudadanos/:movilizadorId', async (req, res) => {
+router.get('/detalle-ciudadanos/:movilizadorId', requireRole('rp', 'admin'), async (req, res) => {
   try {
-    const { movilizadorId } = req.params;
-    const [rows] = await db.query(
+    const movilizadorId = parseId(req.params.movilizadorId);
+    if (!movilizadorId) return res.status(400).json({ error: 'ID inválido' });
+    const [rows] = await db.execute(
       `SELECT id, nombre, paterno, materno, seccion, visitas, status_voto
        FROM ciudadanos
        WHERE movilizador_id = ? AND deleted = 0
@@ -38,14 +54,28 @@ router.get('/detalle-ciudadanos/:movilizadorId', async (req, res) => {
   }
 });
 
-// Incrementar visitas a domicilio
-router.put('/visita/:ciudadanoId', async (req, res) => {
+// Incrementar visitas a domicilio (solo movilizador dueño o admin)
+router.put('/visita/:ciudadanoId', requireRole('movilizador', 'admin'), async (req, res) => {
   try {
-    const { ciudadanoId } = req.params;
-    await db.query(
-      'UPDATE ciudadanos SET visitas = visitas + 1 WHERE id = ?',
+    const ciudadanoId = parseId(req.params.ciudadanoId);
+    if (!ciudadanoId) return res.status(400).json({ error: 'ID inválido' });
+
+    // Verificar que el ciudadano pertenece al movilizador actual
+    if (req.user.rol === 'movilizador') {
+      const [check] = await db.execute(
+        'SELECT id FROM ciudadanos WHERE id = ? AND movilizador_id = ? AND deleted = 0',
+        [ciudadanoId, req.user.id]
+      );
+      if (check.length === 0) {
+        return res.status(403).json({ error: 'Este ciudadano no está asignado a ti' });
+      }
+    }
+
+    const [result] = await db.execute(
+      'UPDATE ciudadanos SET visitas = visitas + 1 WHERE id = ? AND deleted = 0',
       [ciudadanoId]
     );
+    if (result.affectedRows === 0) return res.status(404).json({ error: 'Ciudadano no encontrado' });
     res.json({ success: true, mensaje: 'Visita registrada' });
   } catch (error) {
     res.status(500).json({ error: 'Error al registrar visita' });
@@ -53,13 +83,27 @@ router.put('/visita/:ciudadanoId', async (req, res) => {
 });
 
 // Guardar ubicación del movilizador
-router.post('/ubicacion', async (req, res) => {
+router.post('/ubicacion', requireRole('movilizador'), async (req, res) => {
   try {
     const { movilizadorId, lat, lng, activo } = req.body;
-    await db.query(
+    const movId = parseId(movilizadorId);
+    if (!movId || typeof lat !== 'number' || typeof lng !== 'number') {
+      return res.status(400).json({ error: 'Datos de ubicación inválidos' });
+    }
+    // Validar rango de coordenadas
+    if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+      return res.status(400).json({ error: 'Coordenadas fuera de rango' });
+    }
+    // Un movilizador solo puede enviar su propia ubicación
+    if (req.user.id !== movId) {
+      return res.status(403).json({ error: 'No puedes enviar ubicación de otro movilizador' });
+    }
+    await db.execute(
       'INSERT INTO ubicaciones_movilizador (movilizador_id, lat, lng, activo, timestamp) VALUES (?, ?, ?, ?, NOW())',
-      [movilizadorId, lat, lng, activo]
+      [movId, lat, lng, activo ? 1 : 0]
     );
+    // Invalidar cache de estado
+    estadoCache.ts = 0;
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: 'Error al guardar ubicación' });
@@ -67,9 +111,8 @@ router.post('/ubicacion', async (req, res) => {
 });
 
 // Obtener ubicaciones recientes de movilizadores (para RP)
-router.get('/ubicaciones', async (req, res) => {
+router.get('/ubicaciones', requireRole('rp', 'admin'), async (req, res) => {
   try {
-    // Solo ubicaciones de los últimos 15 minutos
     const [rows] = await db.query(
       'SELECT movilizador_id, lat, lng, activo, timestamp FROM ubicaciones_movilizador WHERE timestamp >= NOW() - INTERVAL 15 MINUTE'
     );
@@ -79,9 +122,12 @@ router.get('/ubicaciones', async (req, res) => {
   }
 });
 
-// Obtener estado de todos los movilizadores con su última ubicación y visitas (para RP)
-router.get('/estado', async (req, res) => {
+// Obtener estado de todos los movilizadores con su última ubicación y visitas (para RP) — con caché
+router.get('/estado', requireRole('rp', 'admin'), async (req, res) => {
   try {
+    if (estadoCache.data && (Date.now() - estadoCache.ts < ESTADO_CACHE_TTL)) {
+      return res.json(estadoCache.data);
+    }
     const [rows] = await db.query(`
       SELECT 
         u.id,
@@ -103,6 +149,7 @@ router.get('/estado', async (req, res) => {
         SELECT movilizador_id, lat, lng, timestamp,
           ROW_NUMBER() OVER (PARTITION BY movilizador_id ORDER BY timestamp DESC) AS rn
         FROM ubicaciones_movilizador
+        WHERE timestamp >= NOW() - INTERVAL 24 HOUR
       ) ub ON ub.movilizador_id = u.id AND ub.rn = 1
       LEFT JOIN (
         SELECT 
@@ -117,6 +164,7 @@ router.get('/estado', async (req, res) => {
       WHERE u.rol = 'movilizador'
       ORDER BY u.nombre
     `);
+    estadoCache = { data: rows, ts: Date.now() };
     res.json(rows);
   } catch (error) {
     console.error('Error en /estado:', error);

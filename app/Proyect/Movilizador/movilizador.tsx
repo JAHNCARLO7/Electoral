@@ -2,12 +2,11 @@ import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator, Alert, Animated, Platform, RefreshControl,
-  ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
+	ActivityIndicator, Alert, Animated, Platform, RefreshControl,
+	ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import { useUser } from '../../../context/UserContext';
-
-/* ---------- PALETA CORPORATIVA ---------- */
+import { API_URL, useAuthFetch } from '../../../hooks/useAuthFetch';
 const C = {
   primary: '#1565C0',
   primaryDark: '#0D47A1',
@@ -33,8 +32,6 @@ interface Ciudadano {
   cel: string; visitas: number;
 }
 
-const API_URL = Platform.OS === 'android' ? 'http://10.0.2.2:8080/api' : 'http://localhost:8080/api';
-
 /* ---------- COMPONENTE ANIMADO ---------- */
 const FadeIn = React.memo(({ delay = 0, children }: { delay?: number; children: React.ReactNode }) => {
   const anim = useRef(new Animated.Value(0)).current;
@@ -49,8 +46,9 @@ const FadeIn = React.memo(({ delay = 0, children }: { delay?: number; children: 
 });
 
 const MovilizadorScreen = () => {
-  const { user, setUser } = useUser();
+  const { user, setUser, setToken } = useUser();
   const router = useRouter();
+  const authFetch = useAuthFetch();
   const [ciudadanos, setCiudadanos] = useState<Ciudadano[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -72,7 +70,7 @@ const MovilizadorScreen = () => {
   const fetchCiudadanos = async () => {
     if (!user) return;
     try {
-      const res = await fetch(`${API_URL}/movilizadores/ciudadanos/${user.id}`);
+      const res = await authFetch(`${API_URL}/movilizadores/ciudadanos/${user.id}`);
       if (!res.ok) throw new Error('Error en la respuesta del servidor');
       const data = await res.json();
       if (Array.isArray(data)) setCiudadanos(data);
@@ -88,7 +86,7 @@ const MovilizadorScreen = () => {
 
   const marcarVisita = async (ciudadanoId: number) => {
     try {
-      const res = await fetch(`${API_URL}/movilizadores/visita/${ciudadanoId}`, { method: 'PUT' });
+      const res = await authFetch(`${API_URL}/movilizadores/visita/${ciudadanoId}`, { method: 'PUT' });
       if (!res.ok) throw new Error('Error en la respuesta del servidor');
       fetchCiudadanos();
     } catch (err: any) {
@@ -108,7 +106,7 @@ const MovilizadorScreen = () => {
         setSendingLocation(true);
         try {
           const location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-          await fetch(`${API_URL}/movilizadores/ubicacion`, {
+          await authFetch(`${API_URL}/movilizadores/ubicacion`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ movilizadorId: user?.id, lat: location.coords.latitude, lng: location.coords.longitude, activo: 1 }),
@@ -124,6 +122,7 @@ const MovilizadorScreen = () => {
   }, [user]);
 
   const handleLogout = () => {
+    setToken(null);
     setUser(null);
     setTimeout(() => router.replace('/Proyect/Login/login'), 250);
   };

@@ -5,8 +5,8 @@ import {
   StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import { useUser } from '../../../context/UserContext';
+import { API_URL as API_BASE, useAuthFetch } from '../../../hooks/useAuthFetch';
 
-const API_BASE = Platform.OS === 'android' ? 'http://10.0.2.2:8080/api' : 'http://localhost:8080/api';
 const API_URL = API_BASE + '/ciudadanos';
 
 /* ---------- PALETA CORPORATIVA ---------- */
@@ -47,8 +47,9 @@ const FadeIn = React.memo(({ delay = 0, children }: { delay?: number; children: 
 });
 
 export default function CasilleroScreen() {
-  const { user, setUser } = useUser();
+  const { user, setUser, setToken } = useUser();
   const router = useRouter();
+  const authFetch = useAuthFetch();
 
   const [secciones, setSecciones] = useState<Seccion[]>([]);
   const [seccionesFiltradas, setSeccionesFiltradas] = useState<Seccion[]>([]);
@@ -65,6 +66,7 @@ export default function CasilleroScreen() {
   const [votosRegistrados, setVotosRegistrados] = useState(0);
 
   const handleLogout = () => {
+    setToken(null);
     setUser(null);
     setTimeout(() => router.replace('/Proyect/Login/login'), 250);
   };
@@ -74,7 +76,7 @@ export default function CasilleroScreen() {
   const cargarSecciones = async () => {
     setCargando(true);
     try {
-      const res = await fetch(API_URL + '/secciones');
+      const res = await authFetch(API_URL + '/secciones');
       const data: Seccion[] = await res.json();
       setSecciones(data);
       setSeccionesFiltradas(data);
@@ -92,7 +94,7 @@ export default function CasilleroScreen() {
     setSeccionSeleccionada(seccion);
     setBusquedaCiudadano('');
     try {
-      const res = await fetch(API_URL + '/seccion/' + seccion);
+      const res = await authFetch(API_URL + '/seccion/' + seccion);
       const data: Ciudadano[] = await res.json();
       setCiudadanos(data);
       setCiudadanosFiltrados(data);
@@ -112,7 +114,7 @@ export default function CasilleroScreen() {
   const confirmarVoto = async () => {
     if (!ciudadanoAVotar) return;
     try {
-      await fetch(API_URL + '/votar/' + ciudadanoAVotar.id, { method: 'PUT' });
+      await authFetch(API_URL + '/votar/' + ciudadanoAVotar.id, { method: 'PUT' });
       setModalVisible(false);
       const nueva = ciudadanos.filter(c => c.id !== ciudadanoAVotar.id);
       setCiudadanos(nueva);
