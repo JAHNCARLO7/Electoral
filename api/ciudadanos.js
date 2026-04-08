@@ -42,4 +42,25 @@ router.put('/votar/:id', async (req, res) => {
   }
 });
 
+// Estadísticas de votos por sección (para RP)
+router.get('/estadisticas/votos', async (req, res) => {
+  try {
+    const [rows] = await db.query(`
+      SELECT 
+        seccion,
+        COUNT(*) AS total,
+        SUM(CASE WHEN status_voto = 'voto' THEN 1 ELSE 0 END) AS votaron,
+        SUM(CASE WHEN status_voto = 'pendiente' THEN 1 ELSE 0 END) AS pendientes
+      FROM ciudadanos
+      WHERE deleted = 0
+      GROUP BY seccion
+      ORDER BY seccion
+    `);
+    res.json(rows);
+  } catch (error) {
+    console.error('Error en /estadisticas/votos:', error);
+    res.status(500).json({ error: 'Error al obtener estadísticas de votos' });
+  }
+});
+
 module.exports = router;

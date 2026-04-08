@@ -26,6 +26,10 @@ app.use('/api/users', usersRouter);
 const ciudadanosRouter = require('./ciudadanos');
 app.use('/api/ciudadanos', ciudadanosRouter);
 
-app.listen(port, () => {
+// Endpoints de movilizadores
+const movilizadoresRouter = require('./movilizadores');
+app.use('/api/movilizadores', movilizadoresRouter);
+
+app.listen(port, '0.0.0.0', () => {
   console.log(`API Electoral escuchando en http://localhost:${port}`);
 });

@@ -8,7 +8,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { UserProvider } from '../context/UserContext';
 
 export const unstable_settings = {
-  anchor: '(tabs)',
+  initialRouteName: 'Proyect',
 };
 
 export default function RootLayout() {
@@ -18,8 +18,7 @@ export default function RootLayout() {
     <UserProvider>
       <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
         <Stack>
-          <Stack.Screen name="(Proyect)" options={{ headerShown: false }} />
-          {/* Modal eliminado */}
+          <Stack.Screen name="Proyect" options={{ headerShown: false }} />
         </Stack>
         <StatusBar style="auto" />
       </ThemeProvider>

@@ -1,3 +1,4 @@
+import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator, Alert,
@@ -24,7 +25,13 @@ type Ciudadano = {
 };
 
 export default function CasilleroScreen() {
-  const { user } = useUser();
+  const { user, setUser } = useUser();
+  const router = useRouter();
+
+  const handleLogout = () => {
+    setUser(null);
+    setTimeout(() => router.replace('/Proyect/Login/login'), 250);
+  };
 
   const [secciones, setSecciones] = useState<Seccion[]>([]);
   const [seccionesFiltradas, setSeccionesFiltradas] = useState<Seccion[]>([]);
@@ -119,6 +126,9 @@ export default function CasilleroScreen() {
   if (!seccionSeleccionada) {
     return (
       <View style={styles.contenedor}>
+        <TouchableOpacity onPress={handleLogout} style={{ position: 'absolute', top: 10, right: 10, zIndex: 20, backgroundColor: '#ff1744', borderRadius: 8, paddingVertical: 6, paddingHorizontal: 12 }}>
+          <Text style={{ color: '#fff', fontWeight: '800', fontSize: 12 }}>Salir</Text>
+        </TouchableOpacity>
         <Text style={styles.titulo}>Bienvenido, {user?.nombre}</Text>
         <Text style={styles.subtitulo}>Selecciona una sección</Text>
 

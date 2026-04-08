@@ -17,8 +17,8 @@ type Usuario = {
 type DeleteState = { visible: boolean; user: Usuario | null };
 
 export default function AdminScreen() {
-	const { user } = useUser();
-	const { router } = require('expo-router');
+	const { user, setUser } = useUser();
+	const router = useRouter();
 	const [users, setUsers] = useState<Usuario[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [modalVisible, setModalVisible] = useState(false);
@@ -116,7 +116,7 @@ export default function AdminScreen() {
 		   <View style={{ flex: 1 }}>
 			   {/* Flecha de regreso, fuera del área de contenido */}
 			   <View style={{ position: 'absolute', top: 10, left: 10, zIndex: 20 }}>
-				   <TouchableOpacity onPress={() => router.replace('/Proyect/Login/login')} style={{ backgroundColor: 'rgba(255,255,255,0.85)', borderRadius: 20, padding: 6, elevation: 2, shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 2 }}>
+				   <TouchableOpacity onPress={() => { setUser(null); setTimeout(() => router.replace('/Proyect/Login/login'), 250); }} style={{ backgroundColor: 'rgba(255,255,255,0.85)', borderRadius: 20, padding: 6, elevation: 2, shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 2 }}>
 					   <Text style={{ fontSize: 28, color: '#007bff' }}>←</Text>
 				   </TouchableOpacity>
 			   </View>

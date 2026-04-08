@@ -34,7 +34,7 @@ import { useUser } from '../../../context/UserContext';
 				if (data.user.rol === 'admin') {
 					router.replace('/Proyect/admin/admin');
 				} else if (data.user.rol === 'movilizador') {
-					router.replace('/Movilizador/movilizador');
+					router.replace('/Proyect/Movilizador/movilizador');
 				} else if (data.user.rol === 'casillero') {
 					router.replace('/Proyect/casillero/casillero');
 				} else if (data.user.rol === 'rp') {
