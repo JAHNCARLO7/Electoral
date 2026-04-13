@@ -201,7 +201,7 @@ const StatusBadge = React.memo(({ estado }: { estado: string }) => {
   const map: Record<string, { bg: string; fg: string; text: string }> = {
     activo: { bg: C.successLight, fg: C.success, text: 'Activo' },
     inactivo: { bg: C.warningLight, fg: C.warning, text: 'Inactivo' },
-    sin_conexion: { bg: C.errorLight, fg: C.error, text: 'Sin conexion' },
+    sin_conexion: { bg: C.errorLight, fg: C.error, text: 'Sin conexión' },
   };
   const m = map[estado] || map.sin_conexion;
   return (
@@ -310,7 +310,7 @@ export default function RPScreen() {
     return secFiltradas.map(e => {
       const v = Number(e.votaron), t = Number(e.total);
       const pct = t > 0 ? (v / t) * 100 : 0;
-      return { label: 'Seccion ' + e.seccion, value: v, total: t, color: pct >= 70 ? C.success : pct >= 40 ? C.warning : C.error };
+      return { label: 'Sección ' + e.seccion, value: v, total: t, color: pct >= 70 ? C.success : pct >= 40 ? C.warning : C.error };
     });
   }, [secFiltradas, estadisticas]);
 
@@ -361,18 +361,18 @@ export default function RPScreen() {
 
         {vista === 'resumen' ? (<>
           <View style={st.kpiRow}>
-            <KPICard num={stats.totalMov} label="Movilizadores" accent={C.primary} icon="👥" bgTint={C.primaryLight} sub={stats.activos + ' en linea'} />
+            <KPICard num={stats.totalMov} label="Movilizadores" accent={C.primary} icon="👥" bgTint={C.primaryLight} sub={stats.activos + ' en línea'} />
             <KPICard num={stats.totalVisitas} label="Visitas" accent={C.purple} icon="🏠" bgTint={C.purpleLight} sub={stats.totalVisitados + ' hogares'} />
           </View>
           <View style={st.kpiRow}>
             <KPICard num={stats.totalGeneral} label="Ciudadanos" accent={C.cyan} icon="📋" bgTint={C.cyanLight} sub={estadisticas.length + ' secciones'} />
-            <KPICard num={stats.totalVotaron} label="Votaron" accent={C.success} icon="✅" bgTint={C.successLight} sub={(stats.totalGeneral > 0 ? Math.round((stats.totalVotaron / stats.totalGeneral) * 100) : 0) + '% del padron'} />
+            <KPICard num={stats.totalVotaron} label="Votaron" accent={C.success} icon="✅" bgTint={C.successLight} sub={(stats.totalGeneral > 0 ? Math.round((stats.totalVotaron / stats.totalGeneral) * 100) : 0) + '% del padrón'} />
           </View>
 
           <View style={[st.card, { backgroundColor: '#FFFDE7' }]}>
             <Text style={st.cardTitle}>Indicadores de Avance</Text>
             <View style={{ flexDirection: 'row', paddingTop: 8, paddingBottom: 4 }}>
-              <SemiGauge value={stats.totalVotaron} total={stats.totalGeneral} color={C.primary} label="Votacion" icon="🗳" />
+              <SemiGauge value={stats.totalVotaron} total={stats.totalGeneral} color={C.primary} label="Votación" icon="🗳" />
               <SemiGauge value={stats.activos} total={stats.totalMov} color={C.success} label="Conectados" icon="📡" />
               <SemiGauge value={stats.totalVisitados} total={stats.totalAsignados} color={C.purple} label="Visitados" icon="🏠" />
             </View>
@@ -380,7 +380,7 @@ export default function RPScreen() {
 
           <View style={[st.card, { backgroundColor: C.purpleLight }]}>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-              <Text style={st.cardTitle}>Monitor de Conexion</Text>
+              <Text style={st.cardTitle}>Monitor de Conexión</Text>
               <View style={st.liveIndicator}>
                 <View style={st.liveDot} />
                 <Text style={st.liveText}>TIEMPO REAL</Text>
@@ -389,7 +389,7 @@ export default function RPScreen() {
             <RingChart size={130} thickness={12} segments={[
               { value: stats.activos, color: C.success, label: 'Activos' },
               { value: stats.inactivos, color: C.warning, label: 'Inactivos' },
-              { value: stats.sinConexion, color: C.error, label: 'Sin conexion' },
+              { value: stats.sinConexion, color: C.error, label: 'Sin conexión' },
             ]} />
             <View style={{ marginTop: 16 }}>
               <View style={st.distBar}>
@@ -416,15 +416,15 @@ export default function RPScreen() {
           )}
 
           <View style={[st.card, { backgroundColor: '#E0F2F1' }]}>
-            <Text style={st.cardTitle}>Avance Electoral por Seccion</Text>
-            <TextInput style={st.searchInput} placeholder="Buscar seccion..." placeholderTextColor={C.textTertiary} value={busquedaSec} onChangeText={setBusquedaSec} />
+            <Text style={st.cardTitle}>Avance Electoral por Sección</Text>
+            <TextInput style={st.searchInput} placeholder="Buscar sección..." placeholderTextColor={C.textTertiary} value={busquedaSec} onChangeText={setBusquedaSec} />
             {secBarData.length === 0 ? (
               <Text style={st.emptyText}>Sin datos</Text>
             ) : (
               <HBarChart data={secBarData} maxVal={Math.max(...secFiltradas.map(e => Number(e.total)), 1)} />
             )}
             <View style={[st.tableHead, { marginTop: 16 }]}>
-              <Text style={[st.thCell, { flex: 1.2 }]}>Seccion</Text>
+              <Text style={[st.thCell, { flex: 1.2 }]}>Sección</Text>
               <Text style={[st.thCell, { flex: 1 }]}>Votaron</Text>
               <Text style={[st.thCell, { flex: 1 }]}>Pend.</Text>
               <Text style={[st.thCell, { flex: 0.8, textAlign: 'right' }]}>%</Text>
@@ -454,14 +454,14 @@ export default function RPScreen() {
             </View>
             <View style={[st.miniStat, { borderLeftColor: C.error }]}>
               <Text style={st.miniStatNum}>{stats.sinConexion}</Text>
-              <Text style={st.miniStatLabel}>Sin senal</Text>
+              <Text style={st.miniStatLabel}>Sin señal</Text>
             </View>
           </View>
 
           <View style={st.card}>
             <Text style={st.cardTitle}>Detalle de Movilizadores</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
-              {([['todos', 'Todos', C.primary], ['activo', 'Activos', C.success], ['inactivo', 'Inactivos', C.warning], ['sin_conexion', 'Sin conexion', C.error]] as const).map(([key, lbl, clr]) => (
+              {([['todos', 'Todos', C.primary], ['activo', 'Activos', C.success], ['inactivo', 'Inactivos', C.warning], ['sin_conexion', 'Sin conexión', C.error]] as const).map(([key, lbl, clr]) => (
                 <TouchableOpacity key={key} onPress={() => setTabActivo(key)}
                   style={[st.tab, tabActivo === key && { backgroundColor: clr, borderColor: clr }]} activeOpacity={0.7}>
                   <Text style={[st.tabText, tabActivo === key && { color: C.white }]}>{lbl}</Text>
@@ -496,7 +496,7 @@ export default function RPScreen() {
                           <StatusBadge estado={m.estado} />
                         </View>
                         <Text style={st.movMeta}>
-                          Senal: {formatTime(m.ultima_ubicacion)}
+                          Señal: {formatTime(m.ultima_ubicacion)}
                           {m.lat != null && m.lng != null && '  |  ' + Number(m.lat).toFixed(4) + ', ' + Number(m.lng).toFixed(4)}
                         </Text>
                       </View>
@@ -535,7 +535,7 @@ export default function RPScreen() {
                             return (
                               <View key={seccion} style={st.secGroup}>
                                 <View style={st.secHead}>
-                                  <Text style={st.secTitle}>Seccion {seccion}</Text>
+                                  <Text style={st.secTitle}>Sección {seccion}</Text>
                                   <Text style={st.secCount}>{visSec}/{lista.length} visitados — {pendSec} sin votar</Text>
                                 </View>
                                 {lista.map(c => (
