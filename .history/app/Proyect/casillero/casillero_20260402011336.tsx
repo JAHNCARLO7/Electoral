@@ -12,42 +12,31 @@ import { useUser } from '../../../context/UserContext';
 
 const API_URL = 'http://10.0.2.2:8080/api/ciudadanos';
 
-type Seccion = {
-  seccion: string;
-};
-
-type Ciudadano = {
-  id: number;
-  nombre: string;
-  paterno: string;
-  materno: string;
-};
-
 export default function CasilleroScreen() {
   const { user } = useUser();
 
-  const [secciones, setSecciones] = useState<Seccion[]>([]);
-  const [seccionesFiltradas, setSeccionesFiltradas] = useState<Seccion[]>([]);
-  const [busquedaSeccion, setBusquedaSeccion] = useState<string>('');
+  const [secciones, setSecciones] = useState([]);
+  const [seccionesFiltradas, setSeccionesFiltradas] = useState([]);
+  const [busquedaSeccion, setBusquedaSeccion] = useState('');
 
-  const [seccionSeleccionada, setSeccionSeleccionada] = useState<string | null>(null);
-  const [ciudadanos, setCiudadanos] = useState<Ciudadano[]>([]);
-  const [ciudadanosFiltrados, setCiudadanosFiltrados] = useState<Ciudadano[]>([]);
-  const [busquedaCiudadano, setBusquedaCiudadano] = useState<string>('');
+  const [seccionSeleccionada, setSeccionSeleccionada] = useState(null);
+  const [ciudadanos, setCiudadanos] = useState([]);
+  const [ciudadanosFiltrados, setCiudadanosFiltrados] = useState([]);
+  const [busquedaCiudadano, setBusquedaCiudadano] = useState('');
 
-  const [ciudadanoAVotar, setCiudadanoAVotar] = useState<Ciudadano | null>(null);
-  const [modalVisible, setModalVisible] = useState<boolean>(false);
-  const [cargando, setCargando] = useState<boolean>(false);
+  const [ciudadanoAVotar, setCiudadanoAVotar] = useState(null);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [cargando, setCargando] = useState(false);
 
   useEffect(() => {
     cargarSecciones();
   }, []);
 
-  const cargarSecciones = async (): Promise<void> => {
+  const cargarSecciones = async () => {
     setCargando(true);
     try {
       const respuesta = await fetch(`${API_URL}/secciones`);
-      const data: Seccion[] = await respuesta.json();
+      const data = await respuesta.json();
       setSecciones(data);
       setSeccionesFiltradas(data);
     } catch (error) {
@@ -56,7 +45,7 @@ export default function CasilleroScreen() {
     setCargando(false);
   };
 
-  const buscarSeccion = (texto: string): void => {
+  const buscarSeccion = (texto: string) => {
     setBusquedaSeccion(texto);
     const filtradas = secciones.filter(s =>
       s.seccion.toLowerCase().includes(texto.toLowerCase())
@@ -64,13 +53,13 @@ export default function CasilleroScreen() {
     setSeccionesFiltradas(filtradas);
   };
 
-  const cargarCiudadanos = async (seccion: string): Promise<void> => {
+  const cargarCiudadanos = async (seccion: string) => {
     setCargando(true);
     setSeccionSeleccionada(seccion);
     setBusquedaCiudadano('');
     try {
       const respuesta = await fetch(`${API_URL}/seccion/${seccion}`);
-      const data: Ciudadano[] = await respuesta.json();
+      const data = await respuesta.json();
       setCiudadanos(data);
       setCiudadanosFiltrados(data);
     } catch (error) {
@@ -79,7 +68,7 @@ export default function CasilleroScreen() {
     setCargando(false);
   };
 
-  const buscarCiudadano = (texto: string): void => {
+  const buscarCiudadano = (texto: string) => {
     setBusquedaCiudadano(texto);
     const filtrados = ciudadanos.filter(c => {
       const nombreCompleto = `${c.nombre} ${c.paterno} ${c.materno}`.toLowerCase();
@@ -88,13 +77,12 @@ export default function CasilleroScreen() {
     setCiudadanosFiltrados(filtrados);
   };
 
-  const abrirConfirmacion = (ciudadano: Ciudadano): void => {
+  const abrirConfirmacion = (ciudadano: any) => {
     setCiudadanoAVotar(ciudadano);
     setModalVisible(true);
   };
 
-  const confirmarVoto = async (): Promise<void> => {
-    if (!ciudadanoAVotar) return;
+  const confirmarVoto = async () => {
     try {
       await fetch(`${API_URL}/votar/${ciudadanoAVotar.id}`, { method: 'PUT' });
       setModalVisible(false);
@@ -110,7 +98,7 @@ export default function CasilleroScreen() {
     }
   };
 
-  const cancelarVoto = (): void => {
+  const cancelarVoto = () => {
     setModalVisible(false);
     setCiudadanoAVotar(null);
   };
