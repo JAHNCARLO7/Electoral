@@ -23,9 +23,6 @@ const usersRouter = require('./users');
 console.log('users.js cargado:', typeof usersRouter);
 app.use('/api/users', usersRouter);
 
-const ciudadanosRouter = require('./ciudadanos');
-app.use('/api/ciudadanos', ciudadanosRouter);
-
 app.listen(port, () => {
   console.log(`API Electoral escuchando en http://localhost:${port}`);
 });
