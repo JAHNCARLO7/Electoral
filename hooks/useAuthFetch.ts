@@ -18,6 +18,11 @@ export function useAuthFetch() {
 
   const authFetch = useCallback(
     async (url: string, options: RequestInit = {}, retries = 2): Promise<Response> => {
+      // Prevenir requests a URLs no autorizadas
+      if (!url.startsWith(API_URL)) {
+        throw new Error('URL no autorizada');
+      }
+
       const headers: Record<string, string> = {
         ...(options.headers as Record<string, string> || {}),
       };

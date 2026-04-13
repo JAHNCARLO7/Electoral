@@ -18,8 +18,8 @@ function validSeccion(val) {
 let statsCache = { data: null, ts: 0 };
 const STATS_CACHE_TTL = 10_000; // 10 segundos
 
-// Obtener todas las secciones disponibles
-router.get('/secciones', async (req, res) => {
+// Obtener todas las secciones disponibles (requiere autenticación — role check en authMiddleware)
+router.get('/secciones', requireRole('casillero', 'rp', 'admin', 'movilizador'), async (req, res) => {
   try {
     const [rows] = await db.query(
       'SELECT DISTINCT seccion FROM ciudadanos WHERE deleted = 0 ORDER BY seccion'
@@ -97,7 +97,7 @@ router.get('/todos', requireRole('admin'), async (req, res) => {
   try {
     const page = Math.max(1, parseInt(req.query.page) || 1);
     const limit = Math.min(200, Math.max(1, parseInt(req.query.limit) || 100));
-    const search = (req.query.search || '').substring(0, 100); // Limitar longitud de búsqueda
+    const search = (req.query.search || '').substring(0, 100).replace(/[%_\\]/g, '\\$&'); // Sanitizar wildcards SQL y limitar longitud
     const offset = (page - 1) * limit;
 
     let whereExtra = '';

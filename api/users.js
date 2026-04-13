@@ -69,8 +69,11 @@ router.post('/', async (req, res) => {
   if (!VALID_ROLES.includes(rol)) {
     return res.status(400).json({ success: false, error: 'Rol inválido' });
   }
+  if (password.length < 8) {
+    return res.status(400).json({ success: false, error: 'La contraseña debe tener al menos 8 caracteres' });
+  }
   try {
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const hashedPassword = await bcrypt.hash(password, 12);
     const [result] = await pool.execute(
       'INSERT INTO usuarios (usuario, password_hash, nombre, rol, activo) VALUES (?, ?, ?, ?, 1)',
       [usuario.trim(), hashedPassword, nombre.trim(), rol]
@@ -102,7 +105,8 @@ router.put('/:id', async (req, res) => {
   if (nombre) { fields.push('nombre = ?'); values.push(nombre.trim()); }
   if (usuario) { fields.push('usuario = ?'); values.push(usuario.trim()); }
   if (password) {
-    const hashedPassword = await bcrypt.hash(password, 10);
+    if (password.length < 8) return res.status(400).json({ success: false, error: 'La contraseña debe tener al menos 8 caracteres' });
+    const hashedPassword = await bcrypt.hash(password, 12);
     fields.push('password_hash = ?'); values.push(hashedPassword);
   }
   if (rol) { fields.push('rol = ?'); values.push(rol); }

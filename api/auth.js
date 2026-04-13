@@ -5,6 +5,8 @@ const pool = require('./db');
 const bcrypt = require('bcrypt');
 const { generateToken } = require('./authMiddleware');
 
+// Caracteres permitidos en usuario (prevenir inyección en logs)
+const VALID_USERNAME = /^[a-zA-Z0-9._@\-]{1,50}$/;
 
 // POST /login { usuario, password }
 router.post('/login', async (req, res) => {
@@ -15,6 +17,9 @@ router.post('/login', async (req, res) => {
   }
   if (usuario.length > 50 || password.length > 100) {
     return res.status(400).json({ error: 'Datos inválidos' });
+  }
+  if (!VALID_USERNAME.test(usuario)) {
+    return res.status(400).json({ error: 'Formato de usuario inválido' });
   }
   try {
     const [rows] = await pool.execute(

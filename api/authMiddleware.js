@@ -6,13 +6,20 @@ if (!JWT_SECRET) {
   console.error('FATAL: La variable de entorno JWT_SECRET no está configurada.');
   process.exit(1);
 }
+if (JWT_SECRET.length < 32) {
+  console.error('FATAL: JWT_SECRET debe tener al menos 32 caracteres.');
+  process.exit(1);
+}
+
+// Algoritmo permitido (previene algorithm confusion attacks)
+const JWT_ALGORITHM = 'HS256';
 
 // Generar token
 function generateToken(user) {
   return jwt.sign(
     { id: user.id, rol: user.rol, nombre: user.nombre },
     JWT_SECRET,
-    { expiresIn: '12h' }
+    { expiresIn: '8h', algorithm: JWT_ALGORITHM }
   );
 }
 
@@ -22,8 +29,12 @@ function authMiddleware(req, res, next) {
   if (!header || !header.startsWith('Bearer ')) {
     return res.status(401).json({ error: 'Token requerido' });
   }
+  const token = header.split(' ')[1];
+  if (!token || token.length > 2000) {
+    return res.status(401).json({ error: 'Token inválido' });
+  }
   try {
-    const decoded = jwt.verify(header.split(' ')[1], JWT_SECRET);
+    const decoded = jwt.verify(token, JWT_SECRET, { algorithms: [JWT_ALGORITHM] });
     req.user = decoded;
     next();
   } catch (e) {
@@ -41,4 +52,5 @@ function requireRole(...roles) {
   };
 }
 
-module.exports = { generateToken, authMiddleware, requireRole, JWT_SECRET };
+// NO exportar JWT_SECRET — solo se usa internamente
+module.exports = { generateToken, authMiddleware, requireRole };
