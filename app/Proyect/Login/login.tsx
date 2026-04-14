@@ -1,16 +1,16 @@
-	import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
 import { ActivityIndicator, Alert, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useUser } from '../../../context/UserContext';
+import { API_URL } from '../../../hooks/useAuthFetch';
 
 	interface LoginProps {
 		onLogin?: (usuario: string, password: string) => Promise<void>;
 	}
 
-
 	const Login: React.FC<LoginProps> = ({ onLogin }) => {
-		const { setUser } = useUser();
+		const { setUser, setToken } = useUser();
 		const [usuario, setUsuario] = useState('');
 		const [password, setPassword] = useState('');
 		const [loading, setLoading] = useState(false);
@@ -19,7 +19,7 @@ import { useUser } from '../../../context/UserContext';
 		// Función para autenticar contra la API electoral
 		const loginWithAPI = async (usuario: string, password: string) => {
 			try {
-				const response = await fetch('http://10.0.2.2:8080/api/auth/login', {
+				const response = await fetch(`${API_URL}/auth/login`, {
 					method: 'POST',
 					headers: { 'Content-Type': 'application/json' },
 					body: JSON.stringify({ usuario, password }),
@@ -29,12 +29,13 @@ import { useUser } from '../../../context/UserContext';
 					throw new Error(data.error || 'Usuario o contraseña incorrectos.');
 				}
 				setUser(data.user);
+				setToken(data.token);
 				Alert.alert('Bienvenido', `Hola ${data.user.nombre} (${data.user.rol})`);
 				// Redirigir según el rol
 				if (data.user.rol === 'admin') {
 					router.replace('/Proyect/admin/admin');
 				} else if (data.user.rol === 'movilizador') {
-					router.replace('/Movilizador/movilizador');
+					router.replace('/Proyect/Movilizador/movilizador');
 				} else if (data.user.rol === 'casillero') {
 					router.replace('/Proyect/casillero/casillero');
 				} else if (data.user.rol === 'rp') {
