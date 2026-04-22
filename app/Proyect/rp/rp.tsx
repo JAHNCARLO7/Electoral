@@ -254,7 +254,7 @@ export default function RPScreen() {
       const votosData = await votosRes.json();
       if (Array.isArray(movData)) setMovilizadores(movData);
       if (Array.isArray(votosData)) setEstadisticas(votosData);
-    } catch (err) { console.warn('Error al cargar datos RP:', err); }
+    } catch (err) { console.warn('Error al cargar datos RG:', err); }
   }, [authFetch]);
 
   const loadInitial = useCallback(async () => { setLoading(true); await fetchData(); setLoading(false); }, [fetchData]);
@@ -334,13 +334,9 @@ export default function RPScreen() {
       <View style={st.header}>
         <View style={{ flex: 1 }}>
           <Text style={st.headerTitle}>Centro de Control</Text>
-          <Text style={st.headerSub}>{user?.nombre} — RP</Text>
+          <Text style={st.headerSub}>{user?.nombre} — RG</Text>
         </View>
         <View style={st.headerRight}>
-          <View style={st.liveIndicator}>
-            <View style={st.liveDot} />
-            <Text style={st.liveText}>EN VIVO</Text>
-          </View>
           <TouchableOpacity style={st.logoutBtn} onPress={handleLogout} activeOpacity={0.7}>
             <Text style={st.logoutText}>Salir</Text>
           </TouchableOpacity>
@@ -401,19 +397,7 @@ export default function RPScreen() {
             </View>
           </View>
 
-          {sparkVisitas.length > 0 && (
-            <View style={[st.card, { backgroundColor: '#E8EAF6' }]}>
-              <Text style={st.cardTitle}>Actividad de Visitas por Movilizador</Text>
-              <SparkBars values={sparkVisitas} color={C.purple} height={40} />
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
-                {movilizadores.map(m => (
-                  <Text key={m.id} style={{ fontSize: 8, color: C.textSecondary, flex: 1, textAlign: 'center' }} numberOfLines={1}>
-                    {m.nombre.split(' ')[0]}
-                  </Text>
-                ))}
-              </View>
-            </View>
-          )}
+          {/* Gráfica de Actividad de Visitas por Movilizador eliminada */}
 
           <View style={[st.card, { backgroundColor: '#E0F2F1' }]}>
             <Text style={st.cardTitle}>Avance Electoral por Sección</Text>
@@ -506,7 +490,7 @@ export default function RPScreen() {
                         <Text style={st.movStatVal}>{vis}</Text>
                         <Text style={st.movStatLbl}>Visitas</Text>
                       </View>
-                      <View style={[st.movStatBox, { borderLeftWidth: 1, borderRightWidth: 1, borderColor: C.cardBorder }]}>
+                      <View style={[st.movStatBox, { borderLeftWidth: 1, borderRightWidth: 1, borderColor: C.cardBorder }]}> 
                         <Text style={st.movStatVal}>{visitados}/{asignados}</Text>
                         <Text style={st.movStatLbl}>Visitados</Text>
                       </View>
@@ -516,50 +500,7 @@ export default function RPScreen() {
                       </View>
                     </View>
                     <AnimatedBar pct={(vis / stats.maxVisitas) * 100} color={C.purple} height={6} />
-                    <TouchableOpacity style={[st.expandBtn, isExpanded && { backgroundColor: C.primary }]}
-                      onPress={() => toggleCiudadanos(m.id)} activeOpacity={0.7}>
-                      <Text style={[st.expandText, isExpanded && { color: C.white }]}>
-                        {isExpanded ? 'Ocultar ciudadanos' : 'Ver ciudadanos asignados'}
-                      </Text>
-                    </TouchableOpacity>
-                    {isExpanded && (
-                      <View style={st.ciudPanel}>
-                        {loadingCiudadanos === m.id ? (
-                          <ActivityIndicator size="small" color={C.primary} style={{ paddingVertical: 16 }} />
-                        ) : ciudadanos.length === 0 ? (
-                          <Text style={st.emptyText}>Sin ciudadanos asignados</Text>
-                        ) : (
-                          Object.entries(porSeccion).sort(([a], [b]) => a.localeCompare(b)).map(([seccion, lista]) => {
-                            const visSec = lista.filter(c => c.visitas > 0).length;
-                            const pendSec = lista.filter(c => c.status_voto === 'pendiente').length;
-                            return (
-                              <View key={seccion} style={st.secGroup}>
-                                <View style={st.secHead}>
-                                  <Text style={st.secTitle}>Sección {seccion}</Text>
-                                  <Text style={st.secCount}>{visSec}/{lista.length} visitados — {pendSec} sin votar</Text>
-                                </View>
-                                {lista.map(c => (
-                                  <View key={c.id} style={st.cRow}>
-                                    <View style={[st.cDot, { backgroundColor: c.visitas > 0 ? C.success : C.error }]} />
-                                    <View style={{ flex: 1 }}>
-                                      <Text style={st.cName}>{c.paterno} {c.materno} {c.nombre}</Text>
-                                      <View style={{ flexDirection: 'row', gap: 10, marginTop: 2 }}>
-                                        <Text style={[st.cTag, { color: c.visitas > 0 ? C.success : C.error }]}>
-                                          {c.visitas > 0 ? '✓ ' + c.visitas + ' visita' + (c.visitas > 1 ? 's' : '') : '✗ Sin visitar'}
-                                        </Text>
-                                        <Text style={[st.cTag, { color: c.status_voto === 'voto' ? C.success : C.error }]}>
-                                          {c.status_voto === 'voto' ? '✓ Voto' : 'Pendiente'}
-                                        </Text>
-                                      </View>
-                                    </View>
-                                  </View>
-                                ))}
-                              </View>
-                            );
-                          })
-                        )}
-                      </View>
-                    )}
+                    {/* Botón y panel de ciudadanos eliminados */}
                   </View>
                 );
               })

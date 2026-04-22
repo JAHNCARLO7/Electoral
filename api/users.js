@@ -69,8 +69,14 @@ router.post('/', async (req, res) => {
   if (!VALID_ROLES.includes(rol)) {
     return res.status(400).json({ success: false, error: 'Rol inválido' });
   }
-  if (password.length < 8) {
-    return res.status(400).json({ success: false, error: 'La contraseña debe tener al menos 8 caracteres' });
+  // Validar contraseña: mínimo 4 dígitos, solo números, no repetida
+  if (!/^[0-9]{4,}$/.test(password)) {
+    return res.status(400).json({ success: false, error: 'La contraseña debe tener al menos 4 dígitos numéricos' });
+  }
+  // Verificar que la contraseña no exista ya en la base de datos
+  const [existing] = await pool.execute('SELECT id FROM usuarios WHERE password_hash = ?', [await bcrypt.hash(password, 12)]);
+  if (existing.length > 0) {
+    return res.status(400).json({ success: false, error: 'La contraseña ya está en uso, elige otra diferente.' });
   }
   try {
     const hashedPassword = await bcrypt.hash(password, 12);
@@ -105,7 +111,12 @@ router.put('/:id', async (req, res) => {
   if (nombre) { fields.push('nombre = ?'); values.push(nombre.trim()); }
   if (usuario) { fields.push('usuario = ?'); values.push(usuario.trim()); }
   if (password) {
-    if (password.length < 8) return res.status(400).json({ success: false, error: 'La contraseña debe tener al menos 8 caracteres' });
+    if (!/^[0-9]{4,}$/.test(password)) return res.status(400).json({ success: false, error: 'La contraseña debe tener al menos 4 dígitos numéricos' });
+    // Verificar que la contraseña no exista ya en la base de datos
+    const [existing] = await pool.execute('SELECT id FROM usuarios WHERE password_hash = ?', [await bcrypt.hash(password, 12)]);
+    if (existing.length > 0) {
+      return res.status(400).json({ success: false, error: 'La contraseña ya está en uso, elige otra diferente.' });
+    }
     const hashedPassword = await bcrypt.hash(password, 12);
     fields.push('password_hash = ?'); values.push(hashedPassword);
   }

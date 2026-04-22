@@ -17,14 +17,16 @@ const ESTADO_CACHE_TTL = 15_000; // 15 segundos
 // Obtener ciudadanos asignados a un movilizador que no han votado
 router.get('/ciudadanos/:movilizadorId', async (req, res) => {
   try {
+    // Ahora cualquier movilizador puede ver todos los ciudadanos pendientes
+    if (req.user.rol === 'movilizador') {
+      const [rows] = await db.execute(
+        'SELECT id, nombre, paterno, materno, calle, no, colonia, seccion, cel, visitas FROM ciudadanos WHERE status_voto = "pendiente" AND deleted = 0'
+      );
+      return res.json(rows);
+    }
+    // Admin y otros roles pueden seguir usando el filtro por movilizador si lo desean
     const movilizadorId = parseId(req.params.movilizadorId);
     if (!movilizadorId) return res.status(400).json({ error: 'ID inválido' });
-
-    // Un movilizador solo puede ver sus propios ciudadanos (admin puede ver todos)
-    if (req.user.rol === 'movilizador' && req.user.id !== movilizadorId) {
-      return res.status(403).json({ error: 'Sin permisos para ver ciudadanos de otro movilizador' });
-    }
-
     const [rows] = await db.execute(
       'SELECT id, nombre, paterno, materno, calle, no, colonia, seccion, cel, visitas FROM ciudadanos WHERE movilizador_id = ? AND status_voto = "pendiente" AND deleted = 0',
       [movilizadorId]
@@ -60,14 +62,15 @@ router.put('/visita/:ciudadanoId', requireRole('movilizador', 'admin'), async (r
     const ciudadanoId = parseId(req.params.ciudadanoId);
     if (!ciudadanoId) return res.status(400).json({ error: 'ID inválido' });
 
-    // Verificar que el ciudadano pertenece al movilizador actual
+    // Ya no se verifica que el ciudadano pertenezca al movilizador actual
+    // Solo se verifica que exista y esté pendiente
     if (req.user.rol === 'movilizador') {
       const [check] = await db.execute(
-        'SELECT id FROM ciudadanos WHERE id = ? AND movilizador_id = ? AND deleted = 0',
-        [ciudadanoId, req.user.id]
+        'SELECT id FROM ciudadanos WHERE id = ? AND status_voto = "pendiente" AND deleted = 0',
+        [ciudadanoId]
       );
       if (check.length === 0) {
-        return res.status(403).json({ error: 'Este ciudadano no está asignado a ti' });
+        return res.status(403).json({ error: 'Este ciudadano no está disponible para visita' });
       }
     }
 
@@ -128,6 +131,7 @@ router.get('/estado', requireRole('rp', 'admin'), async (req, res) => {
     if (estadoCache.data && (Date.now() - estadoCache.ts < ESTADO_CACHE_TTL)) {
       return res.json(estadoCache.data);
     }
+    // Nueva lógica: contar visitas y ciudadanos visitados por movilizador (sin asignación)
     const [rows] = await db.query(`
       SELECT 
         u.id,
@@ -142,8 +146,7 @@ router.get('/estado', requireRole('rp', 'admin'), async (req, res) => {
           ELSE 'inactivo'
         END AS estado,
         IFNULL(v.total_visitas, 0) AS total_visitas,
-        IFNULL(v.ciudadanos_visitados, 0) AS ciudadanos_visitados,
-        IFNULL(v.ciudadanos_asignados, 0) AS ciudadanos_asignados
+        IFNULL(v.ciudadanos_visitados, 0) AS ciudadanos_visitados
       FROM usuarios u
       LEFT JOIN (
         SELECT movilizador_id, lat, lng, timestamp,
@@ -153,13 +156,17 @@ router.get('/estado', requireRole('rp', 'admin'), async (req, res) => {
       ) ub ON ub.movilizador_id = u.id AND ub.rn = 1
       LEFT JOIN (
         SELECT 
-          movilizador_id,
-          SUM(visitas) AS total_visitas,
-          SUM(CASE WHEN visitas > 0 THEN 1 ELSE 0 END) AS ciudadanos_visitados,
-          COUNT(*) AS ciudadanos_asignados
-        FROM ciudadanos
-        WHERE deleted = 0
-        GROUP BY movilizador_id
+          v.movilizador_id,
+          COUNT(v.id) AS ciudadanos_visitados,
+          SUM(v.veces) AS total_visitas
+        FROM (
+          SELECT um.movilizador_id, c.id, COUNT(*) AS veces
+          FROM ubicaciones_movilizador um
+          JOIN ciudadanos c ON um.lat IS NOT NULL -- dummy join to allow counting
+          WHERE um.movilizador_id IS NOT NULL
+          GROUP BY um.movilizador_id, c.id
+        ) v
+        GROUP BY v.movilizador_id
       ) v ON v.movilizador_id = u.id
       WHERE u.rol = 'movilizador'
       ORDER BY u.nombre

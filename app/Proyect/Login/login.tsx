@@ -39,7 +39,7 @@ import { API_URL } from '../../../hooks/useAuthFetch';
 				} else if (data.user.rol === 'casillero') {
 					router.replace('/Proyect/casillero/casillero');
 				} else if (data.user.rol === 'rp') {
-					router.replace('/Proyect/rp/rp');
+					router.replace('/Proyect/rp/rp'); // RG visual
 				}
 			} catch (err: any) {
 				Alert.alert('Error', err.message || 'Error de autenticación');
@@ -49,6 +49,10 @@ import { API_URL } from '../../../hooks/useAuthFetch';
 		const handleLogin = async () => {
 			if (!usuario.trim() || !password.trim()) {
 				Alert.alert('Error', 'Ingresa tu usuario y contraseña.');
+				return;
+			}
+			if (!/^[0-9]{4,}$/.test(password)) {
+				Alert.alert('Error', 'La contraseña debe tener al menos 4 dígitos numéricos.');
 				return;
 			}
 			setLoading(true);

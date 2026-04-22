@@ -2,8 +2,8 @@ import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator, Alert, Animated, Platform, RefreshControl,
-  ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View,
+  ActivityIndicator, Alert, Animated, Modal, Platform, RefreshControl,
+  ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View
 } from 'react-native';
 import { useUser } from '../../../context/UserContext';
 import { API_URL, useAuthFetch } from '../../../hooks/useAuthFetch';
@@ -56,6 +56,7 @@ const MovilizadorScreen = () => {
   const [busquedaSeccion, setBusquedaSeccion] = useState('');
   const [busquedaNombre, setBusquedaNombre] = useState<Record<string, string>>({});
   const [seccionSeleccionada, setSeccionSeleccionada] = useState<string | null>(null);
+  const [modalSeccion, setModalSeccion] = useState<string | null>(null);
 
   const ciudadanosPorSeccion = useMemo(() =>
     ciudadanos.reduce((acc: Record<string, Ciudadano[]>, c) => {
@@ -97,6 +98,7 @@ const MovilizadorScreen = () => {
   useEffect(() => {
     let interval: any;
     const startLocationUpdates = async () => {
+      Alert.alert('Debug', 'Intentando pedir permiso de ubicación');
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
         Alert.alert('Permiso de ubicación requerido', 'La aplicación necesita acceso a tu ubicación.');
@@ -146,6 +148,31 @@ const MovilizadorScreen = () => {
 
   return (
     <View style={st.container}>
+      {/* MODAL CONFIRMACIÓN SECCIÓN */}
+      <Modal
+        visible={!!modalSeccion}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setModalSeccion(null)}
+      >
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'center', alignItems: 'center' }}>
+          <View style={{ backgroundColor: C.white, borderRadius: 16, padding: 28, width: '80%', alignItems: 'center', elevation: 8 }}>
+            <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 10, color: C.primary }}>Confirmar acceso</Text>
+            <Text style={{ fontSize: 15, color: C.textPrimary, textAlign: 'center', marginBottom: 18 }}>
+              ¿Estás seguro de ingresar a la sección {modalSeccion}?
+              {'\n'}Se registrará tu acceso con tu número.
+            </Text>
+            <View style={{ flexDirection: 'row', gap: 18 }}>
+              <TouchableOpacity style={{ paddingVertical: 10, paddingHorizontal: 18, borderRadius: 8, backgroundColor: C.errorLight, borderWidth: 1, borderColor: C.error }} onPress={() => setModalSeccion(null)}>
+                <Text style={{ color: C.error, fontWeight: 'bold' }}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={{ paddingVertical: 10, paddingHorizontal: 18, borderRadius: 8, backgroundColor: C.primary }} onPress={() => { setSeccionSeleccionada(modalSeccion); setModalSeccion(null); }}>
+                <Text style={{ color: C.white, fontWeight: 'bold' }}>Ingresar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
       {/* HEADER */}
       <View style={st.header}>
         <View style={{ flex: 1 }}>
@@ -214,7 +241,7 @@ const MovilizadorScreen = () => {
                 const pct = lista.length > 0 ? Math.round((visitados / lista.length) * 100) : 0;
                 return (
                   <FadeIn key={seccion} delay={i * 60}>
-                    <TouchableOpacity style={st.secCard} onPress={() => setSeccionSeleccionada(seccion)} activeOpacity={0.7}>
+                    <TouchableOpacity style={st.secCard} onPress={() => setModalSeccion(seccion)} activeOpacity={0.7}>
                       <View style={st.secLeft}>
                         <View style={st.secIcon}>
                           <Text style={st.secIconText}>{seccion}</Text>

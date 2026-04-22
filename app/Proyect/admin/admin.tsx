@@ -375,7 +375,7 @@ export default function AdminScreen() {
             <TextInput style={st.input} placeholder="Nombre completo" placeholderTextColor={C.textTertiary} value={form.nombre} onChangeText={t => setForm(f => ({ ...f, nombre: t }))} />
             <Text style={st.fieldLabel}>Rol</Text>
             <View style={st.roleRow}>
-              {['admin', 'movilizador', 'casillero', 'rp'].map(r => (
+              {['admin', 'movilizador', 'casillero', 'RG'].map(r => (
                 <TouchableOpacity key={r} style={[st.roleBtn, form.rol === r && { backgroundColor: C.primary }]}
                   onPress={() => setForm(f => ({ ...f, rol: r }))}>
                   <Text style={[st.roleBtnText, form.rol === r && { color: C.white }]}>{r}</Text>
@@ -400,7 +400,7 @@ export default function AdminScreen() {
             <TextInput style={st.input} placeholder="Nombre" placeholderTextColor={C.textTertiary} value={editForm?.nombre || ''} onChangeText={t => setEditForm((f: any) => ({ ...f, nombre: t }))} />
             <Text style={st.fieldLabel}>Rol</Text>
             <View style={st.roleRow}>
-              {['admin', 'movilizador', 'casillero', 'rp'].map(r => (
+              {['admin', 'movilizador', 'casillero', 'RG'].map(r => (
                 <TouchableOpacity key={r} style={[st.roleBtn, editForm?.rol === r && { backgroundColor: C.primary }]}
                   onPress={() => setEditForm((f: any) => ({ ...f, rol: r }))}>
                   <Text style={[st.roleBtnText, editForm?.rol === r && { color: C.white }]}>{r}</Text>
