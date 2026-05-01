@@ -80,7 +80,7 @@ export default function AdminScreen() {
       const res = await authFetch(API_URL + '/users');
       const data = await res.json();
       if (data.success) setUsers(data.users);
-    } catch (e) { setError('Error al cargar usuarios'); }
+    } catch (e: any) { if (!e?.message?.includes('expirada') && !e?.message?.includes('eliminado')) setError('Error al cargar usuarios'); }
     setLoadingUsers(false);
   };
 
@@ -121,8 +121,9 @@ export default function AdminScreen() {
         : API_URL + '/ciudadanos/' + deleteState.item.id;
       const res = await authFetch(url, { method: 'DELETE' });
       if (!res.ok) { setError('Error al eliminar'); setSaving(false); return; }
+      const deletedType = deleteState.type;
       setDeleteState({ visible: false, item: null, type: null });
-      if (deleteState.type === 'user') fetchUsers(); else fetchCiudadanos();
+      setTimeout(() => { if (deletedType === 'user') fetchUsers(); else fetchCiudadanos(); }, 300);
     } catch (e) { setError('Error de red'); }
     setSaving(false);
   };
@@ -145,7 +146,7 @@ export default function AdminScreen() {
         setCiudTotalPages(cData.totalPages);
       }
       if (Array.isArray(mData)) setMovilizadores(mData);
-    } catch (e) { setError('Error al cargar ciudadanos'); }
+    } catch (e: any) { if (!e?.message?.includes('expirada') && !e?.message?.includes('eliminado')) setError('Error al cargar ciudadanos'); }
     setLoadingCiudadanos(false);
   };
 
@@ -300,14 +301,6 @@ export default function AdminScreen() {
               <Text style={[st.statNum, { color: C.primary }]}>{ciudTotal}</Text>
               <Text style={st.statLabel}>Total</Text>
             </View>
-            <View style={[st.statCard, { backgroundColor: C.successLight }]}>
-              <Text style={[st.statNum, { color: C.success }]}>{ciudadanos.filter(c => c.movilizador_id).length}</Text>
-              <Text style={st.statLabel}>Asignados</Text>
-            </View>
-            <View style={[st.statCard, { backgroundColor: C.warningLight }]}>
-              <Text style={[st.statNum, { color: C.warning }]}>{ciudadanos.filter(c => !c.movilizador_id).length}</Text>
-              <Text style={st.statLabel}>Sin asignar</Text>
-            </View>
           </View>
           <TextInput style={st.searchInput} placeholder="Buscar nombre o sección (servidor)..." placeholderTextColor={C.textTertiary}
             value={searchCiudadanos} onChangeText={handleSearchCiudadanos} />
@@ -331,15 +324,12 @@ export default function AdminScreen() {
               renderItem={({ item }) => (
                 <View style={st.card}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                    <View style={[st.avatar, { backgroundColor: item.movilizador_id ? C.success : C.warning }]}>
+                    <View style={[st.avatar, { backgroundColor: C.primary }]}>
                       <Text style={st.avatarText}>{(item.paterno || '?')[0].toUpperCase()}</Text>
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={st.cardName}>{item.paterno} {item.materno} {item.nombre}</Text>
                       <Text style={st.cardMeta}>Sec. {item.seccion} • {item.calle} #{item.no}</Text>
-                      <Text style={[st.cardMeta, { color: item.movilizador_id ? C.success : C.warning, fontWeight: '700' }]}>
-                        {item.movilizador_nombre ? '✓ ' + item.movilizador_nombre : 'Sin movilizador'}
-                      </Text>
                     </View>
                     <View style={{ flexDirection: 'row', gap: 8 }}>
                       <TouchableOpacity style={st.editBtn} onPress={() => {
@@ -431,7 +421,7 @@ export default function AdminScreen() {
               <View style={{ backgroundColor: C.primaryLight, borderRadius: 10, padding: 12, marginBottom: 14, borderWidth: 1, borderColor: C.cardBorder }}>
                 <Text style={{ fontSize: 12, fontWeight: '800', color: C.primary, marginBottom: 4 }}>Campos a rellenar:</Text>
                 <Text style={{ fontSize: 11, color: C.textSecondary, lineHeight: 18 }}>
-                  Nombre*, Apellido paterno*, Apellido materno, Calle, Número, Colonia, Sección*, Celular y Movilizador asignado.{'\n'}Los campos con * son obligatorios.
+                  Nombre*, Apellido paterno*, Apellido materno, Calle, Número, Colonia, Sección*, Celular.{'\n'}Los campos con * son obligatorios. El movilizador se puede asignar después.
                 </Text>
               </View>
               <TextInput style={st.input} placeholder="Nombre *" placeholderTextColor={C.textTertiary} value={ciudForm.nombre} onChangeText={t => setCiudForm(f => ({ ...f, nombre: t }))} />
@@ -442,7 +432,6 @@ export default function AdminScreen() {
               <TextInput style={st.input} placeholder="Colonia" placeholderTextColor={C.textTertiary} value={ciudForm.colonia} onChangeText={t => setCiudForm(f => ({ ...f, colonia: t }))} />
               <TextInput style={st.input} placeholder="Sección *" placeholderTextColor={C.textTertiary} value={ciudForm.seccion} onChangeText={t => setCiudForm(f => ({ ...f, seccion: t }))} />
               <TextInput style={st.input} placeholder="Celular" placeholderTextColor={C.textTertiary} value={ciudForm.cel} onChangeText={t => setCiudForm(f => ({ ...f, cel: t }))} keyboardType="phone-pad" />
-              {renderMovSelector(ciudForm.movilizador_id, v => setCiudForm(f => ({ ...f, movilizador_id: v })))}
               <View style={st.modalActions}>
                 <TouchableOpacity style={st.cancelBtn} onPress={() => setCiudModalVisible(false)}><Text style={st.cancelBtnText}>Cancelar</Text></TouchableOpacity>
                 <TouchableOpacity style={st.saveBtn} onPress={handleAddCiudadano} disabled={saving}><Text style={st.saveBtnText}>{saving ? 'Guardando...' : 'Guardar'}</Text></TouchableOpacity>
@@ -466,7 +455,6 @@ export default function AdminScreen() {
               <TextInput style={st.input} placeholder="Colonia" placeholderTextColor={C.textTertiary} value={editCiudForm?.colonia || ''} onChangeText={t => setEditCiudForm((f: any) => ({ ...f, colonia: t }))} />
               <TextInput style={st.input} placeholder="Sección" placeholderTextColor={C.textTertiary} value={editCiudForm?.seccion || ''} onChangeText={t => setEditCiudForm((f: any) => ({ ...f, seccion: t }))} />
               <TextInput style={st.input} placeholder="Celular" placeholderTextColor={C.textTertiary} value={editCiudForm?.cel || ''} onChangeText={t => setEditCiudForm((f: any) => ({ ...f, cel: t }))} keyboardType="phone-pad" />
-              {renderMovSelector(editCiudForm?.movilizador_id || '', v => setEditCiudForm((f: any) => ({ ...f, movilizador_id: v })))}
               <View style={st.modalActions}>
                 <TouchableOpacity style={st.cancelBtn} onPress={() => { setEditCiudModalVisible(false); setEditCiudForm(null); }}><Text style={st.cancelBtnText}>Cancelar</Text></TouchableOpacity>
                 <TouchableOpacity style={st.saveBtn} onPress={handleEditCiudadano} disabled={saving}><Text style={st.saveBtnText}>{saving ? 'Guardando...' : 'Guardar'}</Text></TouchableOpacity>
@@ -477,7 +465,7 @@ export default function AdminScreen() {
       </Modal>
 
       {/* Modal Eliminar */}
-      <Modal visible={deleteState.visible} animationType="fade" transparent>
+      <Modal visible={deleteState.visible} animationType="none" transparent>
         <View style={st.modalBg}>
           <View style={[st.modalBox, { alignItems: 'center' }]}>
             <Text style={{ fontSize: 18, fontWeight: '800', color: C.error, marginBottom: 12 }}>

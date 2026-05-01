@@ -1,6 +1,6 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useUser } from '../../../context/UserContext';
 import { API_URL } from '../../../hooks/useAuthFetch';
@@ -10,11 +10,19 @@ import { API_URL } from '../../../hooks/useAuthFetch';
 	}
 
 	const Login: React.FC<LoginProps> = ({ onLogin }) => {
-		const { setUser, setToken } = useUser();
+		const { setUser, setToken, logoutMessage, setLogoutMessage } = useUser();
 		const [usuario, setUsuario] = useState('');
 		const [password, setPassword] = useState('');
 		const [loading, setLoading] = useState(false);
 		const [showPass, setShowPass] = useState(false);
+
+		// Limpiar mensaje de cierre de sesión después de mostrarlo
+		useEffect(() => {
+			if (logoutMessage) {
+				const t = setTimeout(() => setLogoutMessage(null), 6000);
+				return () => clearTimeout(t);
+			}
+		}, [logoutMessage]);
 
 		// Función para autenticar contra la API electoral
 		const loginWithAPI = async (usuario: string, password: string) => {
@@ -67,6 +75,11 @@ import { API_URL } from '../../../hooks/useAuthFetch';
 		return (
 			<View style={styles.root}>
 				<View style={styles.accentBar} />
+			{logoutMessage ? (
+				<View style={styles.logoutBanner}>
+					<Text style={styles.logoutBannerText}>{logoutMessage}</Text>
+				</View>
+			) : null}
 				<View style={styles.headerContainer}>
 					<View style={styles.shieldWrapper}>
 						<View style={styles.shieldOuter}>
@@ -161,6 +174,19 @@ import { API_URL } from '../../../hooks/useAuthFetch';
 			backgroundColor: '#1e90ff',
 			borderRadius: 3,
 			marginBottom: 12,
+		},
+		logoutBanner: {
+			backgroundColor: '#c62828',
+			borderRadius: 8,
+			paddingVertical: 10,
+			paddingHorizontal: 14,
+			marginBottom: 12,
+		},
+		logoutBannerText: {
+			color: '#fff',
+			fontWeight: '700',
+			fontSize: 14,
+			textAlign: 'center',
 		},
 		headerContainer: {
 			alignItems: 'center',

@@ -14,21 +14,68 @@ function parseId(val) {
 let estadoCache = { data: null, ts: 0 };
 const ESTADO_CACHE_TTL = 15_000; // 15 segundos
 
-// Obtener ciudadanos asignados a un movilizador que no han votado
+// Resumen de secciones para el movilizador (reemplaza la carga masiva de todos los ciudadanos)
+router.get('/secciones-resumen', requireRole('movilizador', 'admin'), async (req, res) => {
+  try {
+    const [rows] = await db.query(`
+      SELECT
+        seccion,
+        COUNT(*) AS total,
+        SUM(CASE WHEN visitas > 0 THEN 1 ELSE 0 END) AS visitados
+      FROM ciudadanos
+      WHERE status_voto = 'pendiente' AND deleted = 0
+      GROUP BY seccion
+      ORDER BY seccion
+    `);
+    res.json(rows);
+  } catch (error) {
+    console.error('Error en /secciones-resumen:', error);
+    res.status(500).json({ error: 'Error al obtener resumen de secciones' });
+  }
+});
+
+// Obtener ciudadanos de una sección específica (carga bajo demanda)
+router.get('/ciudadanos-seccion/:seccion', requireRole('movilizador', 'admin'), async (req, res) => {
+  try {
+    const seccion = (req.params.seccion || '').trim();
+    if (!seccion || !/^[A-Za-z0-9\-]{1,20}$/.test(seccion)) {
+      return res.status(400).json({ error: 'Sección inválida' });
+    }
+    const [rows] = await db.execute(
+      `SELECT id, nombre, paterno, materno, calle, no, colonia, seccion, cel, visitas
+       FROM ciudadanos
+       WHERE seccion = ? AND status_voto = 'pendiente' AND deleted = 0
+       ORDER BY paterno, materno, nombre`,
+      [seccion]
+    );
+    res.json(rows);
+  } catch (error) {
+    console.error('Error en /ciudadanos-seccion:', error);
+    res.status(500).json({ error: 'Error al obtener ciudadanos de la sección' });
+  }
+});
+
+// Obtener ciudadanos (mantenido por compatibilidad, limitado a 500 registros)
 router.get('/ciudadanos/:movilizadorId', async (req, res) => {
   try {
-    // Ahora cualquier movilizador puede ver todos los ciudadanos pendientes
     if (req.user.rol === 'movilizador') {
       const [rows] = await db.execute(
-        'SELECT id, nombre, paterno, materno, calle, no, colonia, seccion, cel, visitas FROM ciudadanos WHERE status_voto = "pendiente" AND deleted = 0'
+        `SELECT id, nombre, paterno, materno, calle, no, colonia, seccion, cel, visitas
+         FROM ciudadanos
+         WHERE status_voto = 'pendiente' AND deleted = 0
+         ORDER BY seccion, paterno
+         LIMIT 500`
       );
       return res.json(rows);
     }
-    // Admin y otros roles pueden seguir usando el filtro por movilizador si lo desean
     const movilizadorId = parseId(req.params.movilizadorId);
     if (!movilizadorId) return res.status(400).json({ error: 'ID inválido' });
     const [rows] = await db.execute(
-      'SELECT id, nombre, paterno, materno, calle, no, colonia, seccion, cel, visitas FROM ciudadanos WHERE movilizador_id = ? AND status_voto = "pendiente" AND deleted = 0',
+      `SELECT id, nombre, paterno, materno, calle, no, colonia, seccion, cel, visitas
+       FROM ciudadanos
+       WHERE movilizador_id = ? AND status_voto = 'pendiente' AND deleted = 0
+       ORDER BY seccion, paterno
+       LIMIT 500`,
       [movilizadorId]
     );
     res.json(rows);
@@ -79,6 +126,16 @@ router.put('/visita/:ciudadanoId', requireRole('movilizador', 'admin'), async (r
       [ciudadanoId]
     );
     if (result.affectedRows === 0) return res.status(404).json({ error: 'Ciudadano no encontrado' });
+
+    // Registrar en visitas_log para estadísticas por movilizador en tiempo real
+    await db.execute(
+      'INSERT INTO visitas_log (ciudadano_id, movilizador_id) VALUES (?, ?)',
+      [ciudadanoId, req.user.id]
+    );
+
+    // Invalidar cache de estado: el RG verá datos actualizados en el siguiente poll
+    estadoCache.ts = 0;
+
     res.json({ success: true, mensaje: 'Visita registrada' });
   } catch (error) {
     res.status(500).json({ error: 'Error al registrar visita' });
@@ -131,9 +188,8 @@ router.get('/estado', requireRole('rp', 'admin'), async (req, res) => {
     if (estadoCache.data && (Date.now() - estadoCache.ts < ESTADO_CACHE_TTL)) {
       return res.json(estadoCache.data);
     }
-    // Nueva lógica: contar visitas y ciudadanos visitados por movilizador (sin asignación)
     const [rows] = await db.query(`
-      SELECT 
+      SELECT
         u.id,
         u.nombre,
         u.activo AS cuenta_activa,
@@ -142,12 +198,18 @@ router.get('/estado', requireRole('rp', 'admin'), async (req, res) => {
         ub.timestamp AS ultima_ubicacion,
         CASE
           WHEN ub.timestamp IS NULL THEN 'sin_conexion'
-          WHEN ub.timestamp >= NOW() - INTERVAL 10 MINUTE THEN 'activo'
+          WHEN ub.timestamp >= NOW() - INTERVAL 12 MINUTE THEN 'activo'
           ELSE 'inactivo'
         END AS estado,
-        IFNULL(v.total_visitas, 0) AS total_visitas,
-        IFNULL(v.ciudadanos_visitados, 0) AS ciudadanos_visitados
+        IFNULL(vl.total_visitas, 0) AS total_visitas,
+        IFNULL(vl.ciudadanos_visitados, 0) AS ciudadanos_visitados,
+        tot.total_pendientes AS ciudadanos_asignados
       FROM usuarios u
+      CROSS JOIN (
+        SELECT COUNT(*) AS total_pendientes
+        FROM ciudadanos
+        WHERE deleted = 0 AND status_voto = 'pendiente'
+      ) tot
       LEFT JOIN (
         SELECT movilizador_id, lat, lng, timestamp,
           ROW_NUMBER() OVER (PARTITION BY movilizador_id ORDER BY timestamp DESC) AS rn
@@ -155,19 +217,13 @@ router.get('/estado', requireRole('rp', 'admin'), async (req, res) => {
         WHERE timestamp >= NOW() - INTERVAL 24 HOUR
       ) ub ON ub.movilizador_id = u.id AND ub.rn = 1
       LEFT JOIN (
-        SELECT 
-          v.movilizador_id,
-          COUNT(v.id) AS ciudadanos_visitados,
-          SUM(v.veces) AS total_visitas
-        FROM (
-          SELECT um.movilizador_id, c.id, COUNT(*) AS veces
-          FROM ubicaciones_movilizador um
-          JOIN ciudadanos c ON um.lat IS NOT NULL -- dummy join to allow counting
-          WHERE um.movilizador_id IS NOT NULL
-          GROUP BY um.movilizador_id, c.id
-        ) v
-        GROUP BY v.movilizador_id
-      ) v ON v.movilizador_id = u.id
+        SELECT
+          movilizador_id,
+          COUNT(*) AS total_visitas,
+          COUNT(DISTINCT ciudadano_id) AS ciudadanos_visitados
+        FROM visitas_log
+        GROUP BY movilizador_id
+      ) vl ON vl.movilizador_id = u.id
       WHERE u.rol = 'movilizador'
       ORDER BY u.nombre
     `);

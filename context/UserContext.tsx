@@ -13,38 +13,47 @@ interface UserContextProps {
   setUser: (user: User | null) => void;
   token: string | null;
   setToken: (token: string | null) => void;
+  logoutMessage: string | null;
+  setLogoutMessage: (msg: string | null) => void;
 }
 
-const UserContext = createContext<UserContextProps>({ user: null, setUser: () => {}, token: null, setToken: () => {} });
+const UserContext = createContext<UserContextProps>({ user: null, setUser: () => {}, token: null, setToken: () => {}, logoutMessage: null, setLogoutMessage: () => {} });
 
 export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUserState] = useState<User | null>(null);
   const [token, setTokenState] = useState<string | null>(null);
+  const [logoutMessage, setLogoutMessage] = useState<string | null>(null);
 
-  // Guardar en AsyncStorage
+  // Guardar en AsyncStorage (falla silenciosamente en web sin módulo nativo)
   const setUser = async (u: User | null) => {
     setUserState(u);
-    if (u) await AsyncStorage.setItem('user', JSON.stringify(u));
-    else await AsyncStorage.removeItem('user');
+    try {
+      if (u) await AsyncStorage.setItem('user', JSON.stringify(u));
+      else await AsyncStorage.removeItem('user');
+    } catch {}
   };
   const setToken = async (t: string | null) => {
     setTokenState(t);
-    if (t) await AsyncStorage.setItem('token', t);
-    else await AsyncStorage.removeItem('token');
+    try {
+      if (t) await AsyncStorage.setItem('token', t);
+      else await AsyncStorage.removeItem('token');
+    } catch {}
   };
 
   // Cargar usuario/token al iniciar
   useEffect(() => {
     (async () => {
-      const u = await AsyncStorage.getItem('user');
-      const t = await AsyncStorage.getItem('token');
-      if (u) setUserState(JSON.parse(u));
-      if (t) setTokenState(t);
+      try {
+        const u = await AsyncStorage.getItem('user');
+        const t = await AsyncStorage.getItem('token');
+        if (u) setUserState(JSON.parse(u));
+        if (t) setTokenState(t);
+      } catch {}
     })();
   }, []);
 
   return (
-    <UserContext.Provider value={{ user, setUser, token, setToken }}>
+    <UserContext.Provider value={{ user, setUser, token, setToken, logoutMessage, setLogoutMessage }}>
       {children}
     </UserContext.Provider>
   );

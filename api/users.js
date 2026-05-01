@@ -3,6 +3,7 @@ const express = require('express');
 const router = express.Router();
 const pool = require('./db');
 const bcrypt = require('bcrypt');
+const { markUserDeleted } = require('./authMiddleware');
 
 // Helper: validar ID entero positivo
 function parseId(val) {
@@ -25,6 +26,7 @@ router.delete('/:id', async (req, res) => {
     if (result.affectedRows === 0) {
       return res.status(404).json({ success: false, error: 'Usuario no encontrado' });
     }
+    markUserDeleted(id);
     res.json({ success: true });
   } catch (err) {
     console.error('Error al desactivar usuario:', err);
@@ -74,10 +76,7 @@ router.post('/', async (req, res) => {
     return res.status(400).json({ success: false, error: 'La contraseña debe tener al menos 4 dígitos numéricos' });
   }
   // Verificar que la contraseña no exista ya en la base de datos
-  const [existing] = await pool.execute('SELECT id FROM usuarios WHERE password_hash = ?', [await bcrypt.hash(password, 12)]);
-  if (existing.length > 0) {
-    return res.status(400).json({ success: false, error: 'La contraseña ya está en uso, elige otra diferente.' });
-  }
+  // NOTA: bcrypt genera salt único, no es posible comparar hashes directamente
   try {
     const hashedPassword = await bcrypt.hash(password, 12);
     const [result] = await pool.execute(
@@ -112,11 +111,6 @@ router.put('/:id', async (req, res) => {
   if (usuario) { fields.push('usuario = ?'); values.push(usuario.trim()); }
   if (password) {
     if (!/^[0-9]{4,}$/.test(password)) return res.status(400).json({ success: false, error: 'La contraseña debe tener al menos 4 dígitos numéricos' });
-    // Verificar que la contraseña no exista ya en la base de datos
-    const [existing] = await pool.execute('SELECT id FROM usuarios WHERE password_hash = ?', [await bcrypt.hash(password, 12)]);
-    if (existing.length > 0) {
-      return res.status(400).json({ success: false, error: 'La contraseña ya está en uso, elige otra diferente.' });
-    }
     const hashedPassword = await bcrypt.hash(password, 12);
     fields.push('password_hash = ?'); values.push(hashedPassword);
   }

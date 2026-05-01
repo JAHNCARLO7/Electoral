@@ -14,7 +14,7 @@ export const API_URL = process.env.EXPO_PUBLIC_API_URL || DEFAULT_API;
  * Redirige a login si recibe 401 (token expirado/inválido).
  */
 export function useAuthFetch() {
-  const { token, setToken, setUser } = useUser();
+  const { token, setToken, setUser, setLogoutMessage } = useUser();
 
   const authFetch = useCallback(
     async (url: string, options: RequestInit = {}, retries = 2): Promise<Response> => {
@@ -35,16 +35,22 @@ export function useAuthFetch() {
 
           // Si el token expiró o es inválido, cerrar sesión
           if (res.status === 401) {
+            let msg = 'Sesión expirada. Inicia sesión nuevamente.';
+            try {
+              const body = await res.clone().json();
+              if (body.error === 'USER_DELETED') msg = 'Tu usuario ha sido eliminado.';
+            } catch {}
+            setLogoutMessage(msg);
             setToken(null);
             setUser(null);
             router.replace('/Proyect/Login/login');
-            throw new Error('Sesión expirada. Inicia sesión nuevamente.');
+            throw new Error(msg);
           }
 
           return res;
         } catch (err: any) {
-          // No reintentar si fue un 401 (sesión expirada)
-          if (err.message?.includes('Sesión expirada')) throw err;
+          // No reintentar si fue un 401 (sesión expirada o eliminado)
+          if (err.message?.includes('Sesión expirada') || err.message?.includes('eliminado')) throw err;
           if (i === retries) throw err;
           // Espera breve antes de reintentar (500ms, 1000ms)
           await new Promise(r => setTimeout(r, 500 * (i + 1)));
@@ -52,7 +58,7 @@ export function useAuthFetch() {
       }
       throw new Error('Error de red');
     },
-    [token, setToken, setUser]
+    [token, setToken, setUser, setLogoutMessage]
   );
 
   return authFetch;

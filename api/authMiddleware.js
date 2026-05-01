@@ -14,6 +14,10 @@ if (JWT_SECRET.length < 32) {
 // Algoritmo permitido (previene algorithm confusion attacks)
 const JWT_ALGORITHM = 'HS256';
 
+// Blacklist en memoria de usuarios desactivados (evita consulta DB en cada request)
+const deletedUserIds = new Set();
+function markUserDeleted(userId) { deletedUserIds.add(Number(userId)); }
+
 // Generar token
 function generateToken(user) {
   return jwt.sign(
@@ -35,6 +39,9 @@ function authMiddleware(req, res, next) {
   }
   try {
     const decoded = jwt.verify(token, JWT_SECRET, { algorithms: [JWT_ALGORITHM] });
+    if (deletedUserIds.has(decoded.id)) {
+      return res.status(401).json({ error: 'USER_DELETED' });
+    }
     req.user = decoded;
     next();
   } catch (e) {
@@ -53,4 +60,4 @@ function requireRole(...roles) {
 }
 
 // NO exportar JWT_SECRET — solo se usa internamente
-module.exports = { generateToken, authMiddleware, requireRole };
+module.exports = { generateToken, authMiddleware, requireRole, markUserDeleted };

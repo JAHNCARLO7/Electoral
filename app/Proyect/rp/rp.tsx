@@ -1,17 +1,17 @@
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-    ActivityIndicator,
-    Animated,
-    Dimensions,
-    Platform,
-    RefreshControl,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Animated,
+  Dimensions,
+  Platform,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { useUser } from '../../../context/UserContext';
 import { API_URL, useAuthFetch } from '../../../hooks/useAuthFetch';
@@ -273,11 +273,15 @@ export default function RPScreen() {
     setLoadingCiudadanos(null);
   }, [expandedMov, ciudadanosMov, authFetch]);
 
+  // Ref para evitar stale closure en el intervalo de polling
+  const fetchDataRef = useRef(fetchData);
+  fetchDataRef.current = fetchData;
+
   useEffect(() => {
     loadInitial();
-    const interval = setInterval(fetchData, 30000);
+    const interval = setInterval(() => fetchDataRef.current(), 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleLogout = useCallback(() => {
     setToken(null);
@@ -622,3 +626,5 @@ const st = StyleSheet.create({
   tRow: { flexDirection: 'row', paddingVertical: 11, paddingHorizontal: 10, borderRadius: 4 },
   tCell: { fontSize: 12, color: C.textPrimary, fontWeight: '600' },
 });
+
+

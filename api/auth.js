@@ -59,4 +59,9 @@ router.post('/login', async (req, res) => {
   }
 });
 
+// GET /me — heartbeat para detectar sesiones eliminadas
+router.get('/me', (req, res) => {
+  res.json({ ok: true });
+});
+
 module.exports = router;

@@ -1,12 +1,13 @@
 import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator, Alert, Animated, Modal, Platform, RefreshControl,
-  ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View
+    ActivityIndicator, Alert, Animated, Modal, Platform, RefreshControl,
+    ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View
 } from 'react-native';
 import { useUser } from '../../../context/UserContext';
 import { API_URL, useAuthFetch } from '../../../hooks/useAuthFetch';
+
 const C = {
   primary: '#1565C0',
   primaryDark: '#0D47A1',
@@ -25,6 +26,12 @@ const C = {
   errorLight: '#FFEBEE',
   track: '#E2E8F0',
 };
+
+interface SeccionResumen {
+  seccion: string;
+  total: number;
+  visitados: number;
+}
 
 interface Ciudadano {
   id: number; nombre: string; paterno: string; materno: string;
@@ -46,59 +53,106 @@ const FadeIn = React.memo(({ delay = 0, children }: { delay?: number; children: 
 });
 
 const MovilizadorScreen = () => {
-  const { user, setUser, setToken } = useUser();
+  const { user, setUser, setToken, token } = useUser();
   const router = useRouter();
   const authFetch = useAuthFetch();
-  const [ciudadanos, setCiudadanos] = useState<Ciudadano[]>([]);
+
+  // Resumen de secciones (carga inicial, ligera)
+  const [secciones, setSecciones] = useState<SeccionResumen[]>([]);
+  // Ciudadanos cargados por sección (caché local)
+  const [ciudadanosPorSeccion, setCiudadanosPorSeccion] = useState<Record<string, Ciudadano[]>>({});
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadingSeccion, setLoadingSeccion] = useState<string | null>(null);
   const [sendingLocation, setSendingLocation] = useState(false);
   const [busquedaSeccion, setBusquedaSeccion] = useState('');
   const [busquedaNombre, setBusquedaNombre] = useState<Record<string, string>>({});
   const [seccionSeleccionada, setSeccionSeleccionada] = useState<string | null>(null);
   const [modalSeccion, setModalSeccion] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const ciudadanosPorSeccion = useMemo(() =>
-    ciudadanos.reduce((acc: Record<string, Ciudadano[]>, c) => {
-      if (!acc[c.seccion]) acc[c.seccion] = [];
-      acc[c.seccion].push(c);
-      return acc;
-    }, {}),
-    [ciudadanos]);
+  // Totales calculados desde los resúmenes de sección
+  const totalVisitados = useMemo(() => secciones.reduce((a, s) => a + Number(s.visitados), 0), [secciones]);
+  const totalCiudadanos = useMemo(() => secciones.reduce((a, s) => a + Number(s.total), 0), [secciones]);
 
-  const totalVisitados = useMemo(() => ciudadanos.filter(c => c.visitas > 0).length, [ciudadanos]);
-
-  const fetchCiudadanos = async () => {
-    if (!user) return;
+  // Cargar resumen de secciones (endpoint ligero)
+  const fetchSecciones = useCallback(async () => {
     try {
-      const res = await authFetch(`${API_URL}/movilizadores/ciudadanos/${user.id}`);
+      setErrorMsg(null);
+      const res = await authFetch(`${API_URL}/movilizadores/secciones-resumen`);
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(`HTTP ${res.status}: ${body?.error || 'Error del servidor'}`);
+      }
+      const data = await res.json();
+      if (Array.isArray(data)) setSecciones(data);
+    } catch (err: any) {
+      const msg = err.message || 'Error desconocido';
+      console.warn('Error al cargar secciones:', msg);
+      setErrorMsg(msg);
+    }
+  }, [authFetch]);
+
+  // Cargar ciudadanos de una sección específica (solo cuando se abre la sección)
+  const fetchCiudadanosSeccion = useCallback(async (seccion: string) => {
+    setLoadingSeccion(seccion);
+    try {
+      const res = await authFetch(`${API_URL}/movilizadores/ciudadanos-seccion/${seccion}`);
       if (!res.ok) throw new Error('Error en la respuesta del servidor');
       const data = await res.json();
-      if (Array.isArray(data)) setCiudadanos(data);
-      else { Alert.alert('Error', 'Respuesta inesperada del servidor'); setCiudadanos([]); }
+      if (Array.isArray(data)) {
+        setCiudadanosPorSeccion(prev => ({ ...prev, [seccion]: data }));
+      }
     } catch (err: any) {
-      Alert.alert('Error', 'No se pudo cargar la lista de ciudadanos.\n' + (err.message || err));
-      setCiudadanos([]);
+      Alert.alert('Error', 'No se pudo cargar la sección.\n' + (err.message || err));
     }
-  };
+    setLoadingSeccion(null);
+  }, [authFetch]);
 
-  const loadInitial = async () => { setLoading(true); await fetchCiudadanos(); setLoading(false); };
-  const onRefresh = async () => { setRefreshing(true); await fetchCiudadanos(); setRefreshing(false); };
+  const loadInitial = useCallback(async () => {
+    setLoading(true);
+    try {
+      await fetchSecciones();
+    } finally {
+      setLoading(false);
+    }
+  }, [fetchSecciones]);
 
-  const marcarVisita = async (ciudadanoId: number) => {
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await fetchSecciones();
+    // Si hay una sección abierta, recargar sus ciudadanos también
+    if (seccionSeleccionada) await fetchCiudadanosSeccion(seccionSeleccionada);
+    setRefreshing(false);
+  }, [fetchSecciones, fetchCiudadanosSeccion, seccionSeleccionada]);
+
+  // Marcar visita: actualiza el estado local sin recargar todo
+  const marcarVisita = useCallback(async (ciudadanoId: number, seccion: string) => {
     try {
       const res = await authFetch(`${API_URL}/movilizadores/visita/${ciudadanoId}`, { method: 'PUT' });
       if (!res.ok) throw new Error('Error en la respuesta del servidor');
-      fetchCiudadanos();
+      // Actualizar estado local en lugar de recargar todo
+      setCiudadanosPorSeccion(prev => {
+        const lista = prev[seccion] || [];
+        return {
+          ...prev,
+          [seccion]: lista.map(c => c.id === ciudadanoId ? { ...c, visitas: c.visitas + 1 } : c),
+        };
+      });
+      // Actualizar el resumen de la sección
+      setSecciones(prev => prev.map(s =>
+        s.seccion === seccion
+          ? { ...s, visitados: s.visitados + (ciudadanosPorSeccion[seccion]?.find(c => c.id === ciudadanoId)?.visitas === 0 ? 1 : 0) }
+          : s
+      ));
     } catch (err: any) {
       Alert.alert('Error', 'No se pudo registrar la visita.\n' + (err.message || err));
     }
-  };
+  }, [authFetch, ciudadanosPorSeccion]);
 
   useEffect(() => {
-    let interval: any;
+    let interval: ReturnType<typeof setInterval>;
     const startLocationUpdates = async () => {
-      Alert.alert('Debug', 'Intentando pedir permiso de ubicación');
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
         Alert.alert('Permiso de ubicación requerido', 'La aplicación necesita acceso a tu ubicación.');
@@ -117,23 +171,34 @@ const MovilizadorScreen = () => {
         setSendingLocation(false);
       };
       await sendLocation();
-      interval = setInterval(sendLocation, 10 * 60 * 1000);
+      interval = setInterval(sendLocation, 5 * 60 * 1000); // Cada 5 min (ventana de actividad = 12 min)
     };
     if (user) startLocationUpdates();
-    return () => interval && clearInterval(interval);
-  }, [user]);
+    return () => { if (interval) clearInterval(interval); };
+  }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleLogout = () => {
+  // Cargar cuando user Y token están disponibles (llegan async desde AsyncStorage o login)
+  useEffect(() => {
+    if (!user || !token) return;
+    loadInitial();
+    const interval = setInterval(fetchSecciones, 30000);
+    return () => clearInterval(interval);
+  }, [user?.id, !!token]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleLogout = useCallback(() => {
     setToken(null);
     setUser(null);
     setTimeout(() => router.replace('/Proyect/Login/login'), 250);
-  };
+  }, [setToken, setUser, router]);
 
-  useEffect(() => {
-    loadInitial();
-    const interval = setInterval(fetchCiudadanos, 30000);
-    return () => clearInterval(interval);
-  }, [user]);
+  const abrirSeccion = useCallback(async (seccion: string) => {
+    setSeccionSeleccionada(seccion);
+    setModalSeccion(null);
+    // Solo cargar si no está ya en caché
+    if (!ciudadanosPorSeccion[seccion]) {
+      await fetchCiudadanosSeccion(seccion);
+    }
+  }, [ciudadanosPorSeccion, fetchCiudadanosSeccion]);
 
   if (loading) return (
     <View style={{ flex: 1, backgroundColor: C.bg, justifyContent: 'center', alignItems: 'center' }}>
@@ -142,9 +207,9 @@ const MovilizadorScreen = () => {
     </View>
   );
 
-  const seccionesFiltradas = Object.entries(ciudadanosPorSeccion)
-    .filter(([seccion]) => seccion.includes(busquedaSeccion.trim()))
-    .sort(([a], [b]) => a.localeCompare(b));
+  const seccionesFiltradas = secciones
+    .filter(s => s.seccion.includes(busquedaSeccion.trim()))
+    .sort((a, b) => a.seccion.localeCompare(b.seccion));
 
   return (
     <View style={st.container}>
@@ -166,13 +231,14 @@ const MovilizadorScreen = () => {
               <TouchableOpacity style={{ paddingVertical: 10, paddingHorizontal: 18, borderRadius: 8, backgroundColor: C.errorLight, borderWidth: 1, borderColor: C.error }} onPress={() => setModalSeccion(null)}>
                 <Text style={{ color: C.error, fontWeight: 'bold' }}>Cancelar</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={{ paddingVertical: 10, paddingHorizontal: 18, borderRadius: 8, backgroundColor: C.primary }} onPress={() => { setSeccionSeleccionada(modalSeccion); setModalSeccion(null); }}>
+              <TouchableOpacity style={{ paddingVertical: 10, paddingHorizontal: 18, borderRadius: 8, backgroundColor: C.primary }} onPress={() => modalSeccion && abrirSeccion(modalSeccion)}>
                 <Text style={{ color: C.white, fontWeight: 'bold' }}>Ingresar</Text>
               </TouchableOpacity>
             </View>
           </View>
         </View>
       </Modal>
+
       {/* HEADER */}
       <View style={st.header}>
         <View style={{ flex: 1 }}>
@@ -182,11 +248,11 @@ const MovilizadorScreen = () => {
         <View style={st.headerRight}>
           {sendingLocation && (
             <View style={st.gpsBadge}>
-              <Text style={st.gpsText}></Text>
+              <Text style={st.gpsText}>GPS</Text>
             </View>
           )}
           <View style={st.statBadge}>
-            <Text style={st.statBadgeNum}>{totalVisitados}/{ciudadanos.length}</Text>
+            <Text style={st.statBadgeNum}>{totalVisitados}/{totalCiudadanos}</Text>
             <Text style={st.statBadgeLabel}>visitados</Text>
           </View>
           <TouchableOpacity style={st.logoutBtn} onPress={handleLogout} activeOpacity={0.7}>
@@ -204,7 +270,7 @@ const MovilizadorScreen = () => {
             {/* KPI RESUMEN */}
             <View style={st.kpiRow}>
               <View style={[st.kpiCard, { backgroundColor: C.primaryLight }]}>
-                <Text style={[st.kpiNum, { color: C.primary }]}>{Object.keys(ciudadanosPorSeccion).length}</Text>
+                <Text style={[st.kpiNum, { color: C.primary }]}>{secciones.length}</Text>
                 <Text style={st.kpiLabel}>Secciones</Text>
               </View>
               <View style={[st.kpiCard, { backgroundColor: C.successLight }]}>
@@ -212,7 +278,7 @@ const MovilizadorScreen = () => {
                 <Text style={st.kpiLabel}>Visitados</Text>
               </View>
               <View style={[st.kpiCard, { backgroundColor: C.errorLight }]}>
-                <Text style={[st.kpiNum, { color: C.error }]}>{ciudadanos.length - totalVisitados}</Text>
+                <Text style={[st.kpiNum, { color: C.error }]}>{totalCiudadanos - totalVisitados}</Text>
                 <Text style={st.kpiLabel}>Pendientes</Text>
               </View>
             </View>
@@ -221,10 +287,10 @@ const MovilizadorScreen = () => {
             <View style={st.progressCard}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
                 <Text style={st.progressLabel}>Avance de visitas</Text>
-                <Text style={st.progressPct}>{ciudadanos.length > 0 ? Math.round((totalVisitados / ciudadanos.length) * 100) : 0}%</Text>
+                <Text style={st.progressPct}>{totalCiudadanos > 0 ? Math.round((totalVisitados / totalCiudadanos) * 100) : 0}%</Text>
               </View>
               <View style={st.progressTrack}>
-                <View style={[st.progressFill, { width: ciudadanos.length > 0 ? `${(totalVisitados / ciudadanos.length) * 100}%` : '0%' }]} />
+                <View style={[st.progressFill, { width: totalCiudadanos > 0 ? `${(totalVisitados / totalCiudadanos) * 100}%` : '0%' }]} />
               </View>
             </View>
 
@@ -233,22 +299,28 @@ const MovilizadorScreen = () => {
               value={busquedaSeccion} onChangeText={setBusquedaSeccion} />
 
             {/* LISTA SECCIONES */}
-            {seccionesFiltradas.length === 0 ? (
+            {errorMsg ? (
+              <View style={{ alignItems: 'center', paddingVertical: 24 }}>
+                <Text style={[st.emptyText, { color: C.error, marginBottom: 12 }]}>⚠️ {errorMsg}</Text>
+                <TouchableOpacity onPress={loadInitial} style={{ backgroundColor: C.primary, borderRadius: 8, paddingVertical: 10, paddingHorizontal: 24 }}>
+                  <Text style={{ color: C.white, fontWeight: '800', fontSize: 13 }}>Reintentar</Text>
+                </TouchableOpacity>
+              </View>
+            ) : seccionesFiltradas.length === 0 ? (
               <Text style={st.emptyText}>No hay ciudadanos asignados</Text>
             ) : (
-              seccionesFiltradas.map(([seccion, lista], i) => {
-                const visitados = lista.filter(c => c.visitas > 0).length;
-                const pct = lista.length > 0 ? Math.round((visitados / lista.length) * 100) : 0;
+              seccionesFiltradas.map((s, i) => {
+                const pct = s.total > 0 ? Math.round((Number(s.visitados) / Number(s.total)) * 100) : 0;
                 return (
-                  <FadeIn key={seccion} delay={i * 60}>
-                    <TouchableOpacity style={st.secCard} onPress={() => setModalSeccion(seccion)} activeOpacity={0.7}>
+                  <FadeIn key={s.seccion} delay={i * 60}>
+                    <TouchableOpacity style={st.secCard} onPress={() => setModalSeccion(s.seccion)} activeOpacity={0.7}>
                       <View style={st.secLeft}>
                         <View style={st.secIcon}>
-                          <Text style={st.secIconText}>{seccion}</Text>
+                          <Text style={st.secIconText}>{s.seccion}</Text>
                         </View>
                         <View>
-                          <Text style={st.secTitle}>Sección {seccion}</Text>
-                          <Text style={st.secMeta}>{lista.length} ciudadanos • {visitados} visitados</Text>
+                          <Text style={st.secTitle}>Sección {s.seccion}</Text>
+                          <Text style={st.secMeta}>{s.total} ciudadanos • {s.visitados} visitados</Text>
                         </View>
                       </View>
                       <View style={{ alignItems: 'flex-end' }}>
@@ -268,59 +340,75 @@ const MovilizadorScreen = () => {
               <Text style={st.backBtnText}>← Regresar a secciones</Text>
             </TouchableOpacity>
 
-            <View style={st.secDetailHeader}>
-              <Text style={st.secDetailTitle}>Sección {seccionSeleccionada}</Text>
-              <View style={st.secDetailBadge}>
-                <Text style={st.secDetailBadgeText}>
-                  {(ciudadanosPorSeccion[seccionSeleccionada] || []).filter(c => c.visitas > 0).length}/{(ciudadanosPorSeccion[seccionSeleccionada] || []).length}
-                </Text>
-              </View>
-            </View>
-
-            <TextInput style={st.searchInput} placeholder="Buscar nombre..." placeholderTextColor={C.textTertiary}
-              value={busquedaNombre[seccionSeleccionada] || ''}
-              onChangeText={txt => setBusquedaNombre(prev => ({ ...prev, [seccionSeleccionada!]: txt }))} />
-
             {(() => {
+              const resumen = secciones.find(s => s.seccion === seccionSeleccionada);
               const lista = ciudadanosPorSeccion[seccionSeleccionada] || [];
-              const filtro = busquedaNombre[seccionSeleccionada] || '';
-              const filtrada = lista.filter(c =>
-                `${c.nombre} ${c.paterno} ${c.materno}`.toLowerCase().includes(filtro.toLowerCase())
-              );
-              if (filtrada.length === 0) return <Text style={st.emptyText}>Sin resultados</Text>;
-              return filtrada.map((item, i) => (
-                <FadeIn key={item.id} delay={i * 40}>
-                  <View style={st.citizenCard}>
-                    <View style={st.citizenRow}>
-                      <View style={[st.avatar, item.visitas > 0 && { backgroundColor: C.success }]}>
-                        <Text style={st.avatarText}>
-                          {(item.nombre || '?')[0]}{(item.paterno || '?')[0]}
-                        </Text>
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                          <Text style={st.citizenName}>{item.nombre} {item.paterno} {item.materno}</Text>
-                          {item.visitas > 0 && (
-                            <View style={st.visitedTag}>
-                              <Text style={st.visitedTagText}>✓ {item.visitas}</Text>
-                            </View>
-                          )}
-                        </View>
-                        <Text style={st.citizenInfo}>{item.calle} #{item.no}, {item.colonia}</Text>
-                        {item.cel ? <Text style={st.citizenInfo}>Tel: {item.cel}</Text> : null}
-                      </View>
-                    </View>
-                    <TouchableOpacity
-                      style={[st.visitBtn, item.visitas > 0 && { backgroundColor: C.primaryLight, borderColor: C.primary }]}
-                      onPress={() => marcarVisita(item.id)} activeOpacity={0.7}>
-                      <Text style={[st.visitBtnText, item.visitas > 0 && { color: C.primary }]}>
-                        {item.visitas > 0 ? 'Registrar otra visita' : 'Marcar visita'}
-                      </Text>
-                    </TouchableOpacity>
+              const visitadosLocal = lista.filter(c => c.visitas > 0).length;
+              return (
+                <View style={st.secDetailHeader}>
+                  <Text style={st.secDetailTitle}>Sección {seccionSeleccionada}</Text>
+                  <View style={st.secDetailBadge}>
+                    <Text style={st.secDetailBadgeText}>
+                      {loadingSeccion === seccionSeleccionada ? '...' : `${visitadosLocal}/${resumen?.total ?? lista.length}`}
+                    </Text>
                   </View>
-                </FadeIn>
-              ));
+                </View>
+              );
             })()}
+
+            {loadingSeccion === seccionSeleccionada ? (
+              <View style={{ padding: 40, alignItems: 'center' }}>
+                <ActivityIndicator size="large" color={C.primary} />
+                <Text style={{ color: C.textSecondary, marginTop: 12, fontWeight: '600' }}>Cargando ciudadanos...</Text>
+              </View>
+            ) : (
+              <>
+                <TextInput style={st.searchInput} placeholder="Buscar nombre..." placeholderTextColor={C.textTertiary}
+                  value={busquedaNombre[seccionSeleccionada] || ''}
+                  onChangeText={txt => setBusquedaNombre(prev => ({ ...prev, [seccionSeleccionada!]: txt }))} />
+
+                {(() => {
+                  const lista = ciudadanosPorSeccion[seccionSeleccionada] || [];
+                  const filtro = busquedaNombre[seccionSeleccionada] || '';
+                  const filtrada = filtro
+                    ? lista.filter(c => `${c.nombre} ${c.paterno} ${c.materno}`.toLowerCase().includes(filtro.toLowerCase()))
+                    : lista;
+                  if (filtrada.length === 0) return <Text style={st.emptyText}>Sin resultados</Text>;
+                  return filtrada.map((item, i) => (
+                    <FadeIn key={item.id} delay={i * 40}>
+                      <View style={st.citizenCard}>
+                        <View style={st.citizenRow}>
+                          <View style={[st.avatar, item.visitas > 0 && { backgroundColor: C.success }]}>
+                            <Text style={st.avatarText}>
+                              {(item.nombre || '?')[0]}{(item.paterno || '?')[0]}
+                            </Text>
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                              <Text style={st.citizenName}>{item.nombre} {item.paterno} {item.materno}</Text>
+                              {item.visitas > 0 && (
+                                <View style={st.visitedTag}>
+                                  <Text style={st.visitedTagText}>✓ {item.visitas}</Text>
+                                </View>
+                              )}
+                            </View>
+                            <Text style={st.citizenInfo}>{item.calle} #{item.no}, {item.colonia}</Text>
+                            {item.cel ? <Text style={st.citizenInfo}>Tel: {item.cel}</Text> : null}
+                          </View>
+                        </View>
+                        <TouchableOpacity
+                          style={[st.visitBtn, item.visitas > 0 && { backgroundColor: C.primaryLight, borderColor: C.primary }]}
+                          onPress={() => marcarVisita(item.id, seccionSeleccionada!)} activeOpacity={0.7}>
+                          <Text style={[st.visitBtnText, item.visitas > 0 && { color: C.primary }]}>
+                            {item.visitas > 0 ? 'Registrar otra visita' : 'Marcar visita'}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    </FadeIn>
+                  ));
+                })()}
+              </>
+            )}
           </>
         )}
         <View style={{ height: 30 }} />

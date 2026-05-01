@@ -1,16 +1,35 @@
 import { Tabs } from 'expo-router';
-import React from 'react';
+import React, { useEffect } from 'react';
 
 import { HapticTab } from '@/components/haptic-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
+import { useUser } from '@/context/UserContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { API_URL, useAuthFetch } from '@/hooks/useAuthFetch';
+
+function SessionHeartbeat() {
+  const { token } = useUser();
+  const authFetch = useAuthFetch();
+
+  useEffect(() => {
+    if (!token) return;
+    const interval = setInterval(() => {
+      authFetch(API_URL + '/auth/me').catch(() => {});
+    }, 30_000);
+    return () => clearInterval(interval);
+  }, [token]);
+
+  return null;
+}
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
 
   return (
-    <Tabs
+    <>
+      <SessionHeartbeat />
+      <Tabs
       screenOptions={{
         tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
         headerShown: false,
@@ -37,5 +56,6 @@ export default function TabLayout() {
       <Tabs.Screen name="rp/rp" options={{ href: null, title: 'RG' }} />
       <Tabs.Screen name="Movilizador/movilizador" options={{ href: null }} />
     </Tabs>
+    </>
   );
 }
