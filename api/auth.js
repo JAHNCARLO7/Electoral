@@ -3,6 +3,7 @@ const express = require('express');
 const router = express.Router();
 const pool = require('./db');
 const bcrypt = require('bcrypt');
+const crypto = require('crypto');
 const { generateToken } = require('./authMiddleware');
 
 // Caracteres permitidos en usuario (prevenir inyección en logs)
@@ -39,10 +40,13 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ success: false, error: 'Credenciales incorrectas' });
     }
 
-    // Actualizar ultimo_login
-    await pool.execute('UPDATE usuarios SET ultimo_login = NOW() WHERE id = ?', [user.id]);
+    // Generar session_token único — invalida cualquier sesión anterior
+    const sessionToken = crypto.randomBytes(32).toString('hex');
 
-    const token = generateToken(user);
+    // Actualizar ultimo_login y session_token
+    await pool.execute('UPDATE usuarios SET ultimo_login = NOW(), session_token = ? WHERE id = ?', [sessionToken, user.id]);
+
+    const token = generateToken(user, sessionToken);
     res.json({
       success: true,
       token,

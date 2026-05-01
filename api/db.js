@@ -45,6 +45,8 @@ const pool = mysql.createPool({
     await pool.query('CREATE INDEX IF NOT EXISTS idx_usuarios_usuario ON usuarios (usuario)');
     // Usuarios: filtro por rol + activo (para listar movilizadores)
     await pool.query('CREATE INDEX IF NOT EXISTS idx_usuarios_rol_activo ON usuarios (rol, activo)');
+    // Sesión única: agregar columna session_token si no existe
+    await pool.query(`ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS session_token VARCHAR(64) NULL DEFAULT NULL`);
     // visitas_log: consultas por movilizador y por ciudadano
     await pool.query('CREATE INDEX IF NOT EXISTS idx_vl_mov ON visitas_log (movilizador_id)');
     await pool.query('CREATE INDEX IF NOT EXISTS idx_vl_ciud ON visitas_log (ciudadano_id)');

@@ -1,7 +1,7 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useUser } from '../../../context/UserContext';
 import { API_URL } from '../../../hooks/useAuthFetch';
 
@@ -15,6 +15,7 @@ import { API_URL } from '../../../hooks/useAuthFetch';
 		const [password, setPassword] = useState('');
 		const [loading, setLoading] = useState(false);
 		const [showPass, setShowPass] = useState(false);
+		const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
 		// Limpiar mensaje de cierre de sesión después de mostrarlo
 		useEffect(() => {
@@ -34,11 +35,10 @@ import { API_URL } from '../../../hooks/useAuthFetch';
 				});
 				const data = await response.json();
 				if (!response.ok || !data.success) {
-					throw new Error(data.error || 'Usuario o contraseña incorrectos.');
+					throw new Error(data.error || 'Credenciales incorrectas.');
 				}
 				setUser(data.user);
 				setToken(data.token);
-				Alert.alert('Bienvenido', `Hola ${data.user.nombre} (${data.user.rol})`);
 				// Redirigir según el rol
 				if (data.user.rol === 'admin') {
 					router.replace('/Proyect/admin/admin');
@@ -47,25 +47,30 @@ import { API_URL } from '../../../hooks/useAuthFetch';
 				} else if (data.user.rol === 'casillero') {
 					router.replace('/Proyect/casillero/casillero');
 				} else if (data.user.rol === 'rp') {
-					router.replace('/Proyect/rp/rp'); // RG visual
+					router.replace('/Proyect/rp/rp');
 				}
 			} catch (err: any) {
-				Alert.alert('Error', err.message || 'Error de autenticación');
+				const raw = err.message || 'Error de autenticación';
+				// Mapear mensajes del backend a texto amigable
+				if (raw.includes('inactivo')) setErrorMsg('Tu cuenta ha sido desactivada. Contacta al administrador.');
+				else if (raw.includes('incorrectas') || raw.includes('incorrectos')) setErrorMsg('Usuario o contraseña incorrectos.');
+				else if (raw.includes('red') || raw.includes('fetch')) setErrorMsg('No se pudo conectar al servidor. Verifica tu conexión.');
+				else setErrorMsg(raw);
 			}
 		};
 
 		const handleLogin = async () => {
+			setErrorMsg(null);
 			if (!usuario.trim() || !password.trim()) {
-				Alert.alert('Error', 'Ingresa tu usuario y contraseña.');
+				setErrorMsg('Ingresa tu usuario y contraseña.');
 				return;
 			}
 			if (!/^[0-9]{4,}$/.test(password)) {
-				Alert.alert('Error', 'La contraseña debe tener al menos 4 dígitos numéricos.');
+				setErrorMsg('La contraseña debe tener al menos 4 dígitos numéricos.');
 				return;
 			}
 			setLoading(true);
 			try {
-				// Enviar el usuario exactamente como lo escribió el usuario (case-sensitive)
 				await loginWithAPI(usuario, password);
 			} finally {
 				setLoading(false);
@@ -78,6 +83,12 @@ import { API_URL } from '../../../hooks/useAuthFetch';
 			{logoutMessage ? (
 				<View style={styles.logoutBanner}>
 					<Text style={styles.logoutBannerText}>{logoutMessage}</Text>
+				</View>
+			) : null}
+			{errorMsg ? (
+				<View style={styles.errorBanner}>
+					<MaterialCommunityIcons name="alert-circle" size={18} color="#c62828" />
+					<Text style={styles.errorBannerText}>{errorMsg}</Text>
 				</View>
 			) : null}
 				<View style={styles.headerContainer}>
@@ -187,6 +198,24 @@ import { API_URL } from '../../../hooks/useAuthFetch';
 			fontWeight: '700',
 			fontSize: 14,
 			textAlign: 'center',
+		},
+		errorBanner: {
+			flexDirection: 'row',
+			alignItems: 'center',
+			gap: 8,
+			backgroundColor: '#fff0f0',
+			borderWidth: 1,
+			borderColor: '#e57373',
+			borderRadius: 8,
+			paddingVertical: 10,
+			paddingHorizontal: 14,
+			marginBottom: 12,
+		},
+		errorBannerText: {
+			flex: 1,
+			color: '#c62828',
+			fontWeight: '600',
+			fontSize: 13,
 		},
 		headerContainer: {
 			alignItems: 'center',

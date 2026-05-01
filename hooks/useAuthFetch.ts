@@ -39,6 +39,7 @@ export function useAuthFetch() {
             try {
               const body = await res.clone().json();
               if (body.error === 'USER_DELETED') msg = 'Tu usuario ha sido eliminado.';
+              else if (body.error === 'SESSION_REPLACED') msg = 'Tu sesión fue iniciada en otro dispositivo.';
             } catch {}
             setLogoutMessage(msg);
             setToken(null);

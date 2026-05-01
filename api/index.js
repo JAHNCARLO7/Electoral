@@ -50,13 +50,6 @@ const limiter = rateLimit({
 });
 app.use('/api', limiter);
 
-// Rate limiting estricto para login
-const loginLimiter = rateLimit({
-  windowMs: 5 * 60 * 1000, // 5 minutos
-  max: 10, // 10 intentos de login por IP
-  message: { error: 'Demasiados intentos de login, espera 5 minutos' },
-});
-
 // Health check para AWS ALB
 app.get('/health', async (req, res) => {
   try {
@@ -74,7 +67,7 @@ app.get('/', (req, res) => {
 
 // Endpoints de autenticación (SIN auth middleware)
 const authRouter = require('./auth');
-app.use('/api/auth', loginLimiter, authRouter);
+app.use('/api/auth', authRouter);
 
 // Endpoints protegidos con JWT
 const usersRouter = require('./users');

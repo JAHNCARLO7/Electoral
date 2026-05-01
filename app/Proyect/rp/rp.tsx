@@ -152,13 +152,13 @@ const SemiGauge = React.memo(({ value, total, color, label, icon }: {
   );
 });
 
-const HBarChart = React.memo(({ data, maxVal }: {
-  data: { label: string; value: number; total: number; color: string }[]; maxVal: number;
+const HBarChart = React.memo(({ data }: {
+  data: { label: string; value: number; total: number; color: string }[];
 }) => (
   <View style={{ gap: 10 }}>
     {data.map((d, i) => {
-      const pct = maxVal > 0 ? (d.value / maxVal) * 100 : 0;
-      const pctReal = d.total > 0 ? Math.round((d.value / d.total) * 100) : 0;
+      const pct = d.total > 0 ? (d.value / d.total) * 100 : 0;
+      const pctReal = Math.round(pct);
       return (
         <View key={i}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
@@ -409,7 +409,7 @@ export default function RPScreen() {
             {secBarData.length === 0 ? (
               <Text style={st.emptyText}>Sin datos</Text>
             ) : (
-              <HBarChart data={secBarData} maxVal={Math.max(...secFiltradas.map(e => Number(e.total)), 1)} />
+              <HBarChart data={secBarData} />
             )}
             <View style={[st.tableHead, { marginTop: 16 }]}>
               <Text style={[st.thCell, { flex: 1.2 }]}>Sección</Text>
