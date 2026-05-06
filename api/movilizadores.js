@@ -56,7 +56,7 @@ router.get('/ciudadanos-seccion/:seccion', requireRole('movilizador', 'admin'), 
 });
 
 // Obtener ciudadanos (mantenido por compatibilidad, limitado a 500 registros)
-router.get('/ciudadanos/:movilizadorId', async (req, res) => {
+router.get('/ciudadanos/:movilizadorId', requireRole('movilizador', 'admin'), async (req, res) => {
   try {
     if (req.user.rol === 'movilizador') {
       const [rows] = await db.execute(

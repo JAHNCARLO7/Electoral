@@ -26,6 +26,14 @@ function markUserDeleted(userId) {
 const sessionCache = new Map(); // userId -> { token, ts }
 const SESSION_CACHE_TTL = 30_000;
 
+// Limpiar entradas viejas del cache cada 10 minutos para evitar memory leak
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, val] of sessionCache) {
+    if (now - val.ts > SESSION_CACHE_TTL * 2) sessionCache.delete(key);
+  }
+}, 10 * 60 * 1000);
+
 async function validateSession(userId, sessionToken) {
   const cached = sessionCache.get(userId);
   if (cached && (Date.now() - cached.ts < SESSION_CACHE_TTL)) {

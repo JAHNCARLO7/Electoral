@@ -31,7 +31,7 @@ router.get('/secciones', requireRole('casillero', 'rp', 'admin', 'movilizador'),
 });
 
 // Obtener ciudadanos de una sección (solo los que no han votado)
-router.get('/seccion/:seccion', async (req, res) => {
+router.get('/seccion/:seccion', requireRole('casillero', 'rp', 'admin', 'movilizador'), async (req, res) => {
   try {
     const { seccion } = req.params;
     if (!validSeccion(seccion)) return res.status(400).json({ error: 'Sección inválida' });

@@ -4,7 +4,7 @@ const router = express.Router();
 const pool = require('./db');
 const bcrypt = require('bcrypt');
 const crypto = require('crypto');
-const { generateToken } = require('./authMiddleware');
+const { generateToken, authMiddleware } = require('./authMiddleware');
 
 // Caracteres permitidos en usuario (prevenir inyección en logs)
 const VALID_USERNAME = /^[a-zA-Z0-9._@\-]{1,50}$/;
@@ -63,8 +63,8 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// GET /me — heartbeat para detectar sesiones eliminadas
-router.get('/me', (req, res) => {
+// GET /me — heartbeat para detectar sesiones eliminadas o reemplazadas
+router.get('/me', authMiddleware, (req, res) => {
   res.json({ ok: true });
 });
 
