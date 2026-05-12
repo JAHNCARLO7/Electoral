@@ -4,7 +4,7 @@ const router = express.Router();
 const pool = require('./db');
 const bcrypt = require('bcrypt');
 const crypto = require('crypto');
-const { generateToken, authMiddleware } = require('./authMiddleware');
+const { generateToken, authMiddleware, invalidateSessionCache } = require('./authMiddleware');
 
 // Caracteres permitidos en usuario (prevenir inyección en logs)
 const VALID_USERNAME = /^[a-zA-Z0-9._@\-]{1,50}$/;
@@ -45,6 +45,8 @@ router.post('/login', async (req, res) => {
 
     // Actualizar ultimo_login y session_token
     await pool.execute('UPDATE usuarios SET ultimo_login = NOW(), session_token = ? WHERE id = ?', [sessionToken, user.id]);
+    // Invalidar caché inmediatamente para que la nueva sesión sea válida de inmediato
+    invalidateSessionCache(user.id);
 
     const token = generateToken(user, sessionToken);
     res.json({

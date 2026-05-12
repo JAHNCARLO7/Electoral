@@ -22,6 +22,10 @@ function markUserDeleted(userId) {
   sessionCache.delete(Number(userId)); // invalidar cache de sesión
 }
 
+function invalidateSessionCache(userId) {
+  sessionCache.delete(Number(userId));
+}
+
 // Cache de session_token por usuario (TTL 30s — evita consulta DB en cada request)
 const sessionCache = new Map(); // userId -> { token, ts }
 const SESSION_CACHE_TTL = 30_000;
@@ -93,4 +97,4 @@ function requireRole(...roles) {
 }
 
 // NO exportar JWT_SECRET — solo se usa internamente
-module.exports = { generateToken, authMiddleware, requireRole, markUserDeleted };
+module.exports = { generateToken, authMiddleware, requireRole, markUserDeleted, invalidateSessionCache };

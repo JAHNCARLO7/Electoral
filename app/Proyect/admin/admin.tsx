@@ -365,10 +365,10 @@ export default function AdminScreen() {
             <TextInput style={st.input} placeholder="Nombre completo" placeholderTextColor={C.textTertiary} value={form.nombre} onChangeText={t => setForm(f => ({ ...f, nombre: t }))} />
             <Text style={st.fieldLabel}>Rol</Text>
             <View style={st.roleRow}>
-              {['admin', 'movilizador', 'casillero', 'RG'].map(r => (
-                <TouchableOpacity key={r} style={[st.roleBtn, form.rol === r && { backgroundColor: C.primary }]}
-                  onPress={() => setForm(f => ({ ...f, rol: r }))}>
-                  <Text style={[st.roleBtnText, form.rol === r && { color: C.white }]}>{r}</Text>
+              {([{ value: 'admin', label: 'admin' }, { value: 'movilizador', label: 'movilizador' }, { value: 'casillero', label: 'casillero' }, { value: 'rp', label: 'RG' }] as { value: string; label: string }[]).map(r => (
+                <TouchableOpacity key={r.value} style={[st.roleBtn, form.rol === r.value && { backgroundColor: C.primary }]}
+                  onPress={() => setForm(f => ({ ...f, rol: r.value }))}>
+                  <Text style={[st.roleBtnText, form.rol === r.value && { color: C.white }]}>{r.label}</Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -390,10 +390,10 @@ export default function AdminScreen() {
             <TextInput style={st.input} placeholder="Nombre" placeholderTextColor={C.textTertiary} value={editForm?.nombre || ''} onChangeText={t => setEditForm((f: any) => ({ ...f, nombre: t }))} />
             <Text style={st.fieldLabel}>Rol</Text>
             <View style={st.roleRow}>
-              {['admin', 'movilizador', 'casillero', 'RG'].map(r => (
-                <TouchableOpacity key={r} style={[st.roleBtn, editForm?.rol === r && { backgroundColor: C.primary }]}
-                  onPress={() => setEditForm((f: any) => ({ ...f, rol: r }))}>
-                  <Text style={[st.roleBtnText, editForm?.rol === r && { color: C.white }]}>{r}</Text>
+              {([{ value: 'admin', label: 'admin' }, { value: 'movilizador', label: 'movilizador' }, { value: 'casillero', label: 'casillero' }, { value: 'rp', label: 'RG' }] as { value: string; label: string }[]).map(r => (
+                <TouchableOpacity key={r.value} style={[st.roleBtn, editForm?.rol === r.value && { backgroundColor: C.primary }]}
+                  onPress={() => setEditForm((f: any) => ({ ...f, rol: r.value }))}>
+                  <Text style={[st.roleBtnText, editForm?.rol === r.value && { color: C.white }]}>{r.label}</Text>
                 </TouchableOpacity>
               ))}
             </View>

@@ -185,6 +185,13 @@ const MovilizadorScreen = () => {
     return () => clearInterval(interval);
   }, [user?.id, !!token]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Polling: refrescar ciudadanos de la sección abierta cada 30s
+  useEffect(() => {
+    if (!seccionSeleccionada) return;
+    const interval = setInterval(() => fetchCiudadanosSeccion(seccionSeleccionada), 30_000);
+    return () => clearInterval(interval);
+  }, [seccionSeleccionada, fetchCiudadanosSeccion]);
+
   const handleLogout = useCallback(() => {
     setToken(null);
     setUser(null);
@@ -217,6 +224,7 @@ const MovilizadorScreen = () => {
       <Modal
         visible={!!modalSeccion}
         transparent
+        
         animationType="fade"
         onRequestClose={() => setModalSeccion(null)}
       >
@@ -225,7 +233,7 @@ const MovilizadorScreen = () => {
             <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 10, color: C.primary }}>Confirmar acceso</Text>
             <Text style={{ fontSize: 15, color: C.textPrimary, textAlign: 'center', marginBottom: 18 }}>
               ¿Estás seguro de ingresar a la sección {modalSeccion}?
-              {'\n'}Se registrará tu acceso con tu número.
+             
             </Text>
             <View style={{ flexDirection: 'row', gap: 18 }}>
               <TouchableOpacity style={{ paddingVertical: 10, paddingHorizontal: 18, borderRadius: 8, backgroundColor: C.errorLight, borderWidth: 1, borderColor: C.error }} onPress={() => setModalSeccion(null)}>

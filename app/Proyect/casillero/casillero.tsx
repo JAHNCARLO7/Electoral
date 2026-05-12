@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator, Animated, FlatList, Modal, Platform,
   StyleSheet, Text, TextInput, TouchableOpacity, View,
@@ -101,6 +101,32 @@ export default function CasilleroScreen() {
     } catch { }
     setCargando(false);
   };
+
+  // Refresh silencioso: no muestra spinner ni resetea búsqueda
+  const busquedaRef = useRef(busquedaCiudadano);
+  useEffect(() => { busquedaRef.current = busquedaCiudadano; }, [busquedaCiudadano]);
+
+  const silentRefreshCiudadanos = useCallback(async (seccion: string) => {
+    try {
+      const res = await authFetch(API_URL + '/seccion/' + seccion);
+      if (!res.ok) return;
+      const data: Ciudadano[] = await res.json();
+      setCiudadanos(data);
+      const filtro = busquedaRef.current.toLowerCase();
+      setCiudadanosFiltrados(
+        filtro ? data.filter(c =>
+          (c.nombre + ' ' + c.paterno + ' ' + c.materno).toLowerCase().includes(filtro)
+        ) : data
+      );
+    } catch { }
+  }, [authFetch]);
+
+  // Polling: refrescar ciudadanos de la sección activa cada 30s
+  useEffect(() => {
+    if (!seccionSeleccionada) return;
+    const interval = setInterval(() => silentRefreshCiudadanos(seccionSeleccionada), 30_000);
+    return () => clearInterval(interval);
+  }, [seccionSeleccionada, silentRefreshCiudadanos]);
 
   const buscarCiudadano = (texto: string) => {
     setBusquedaCiudadano(texto);

@@ -10,7 +10,7 @@ import { API_URL } from '../../../hooks/useAuthFetch';
 	}
 
 	const Login: React.FC<LoginProps> = ({ onLogin }) => {
-		const { setUser, setToken, logoutMessage, setLogoutMessage } = useUser();
+		const { setUser, setToken, logoutMessage, setLogoutMessage, setSessionActive } = useUser();
 		const [usuario, setUsuario] = useState('');
 		const [password, setPassword] = useState('');
 		const [loading, setLoading] = useState(false);
@@ -37,6 +37,7 @@ import { API_URL } from '../../../hooks/useAuthFetch';
 				if (!response.ok || !data.success) {
 					throw new Error(data.error || 'Credenciales incorrectas.');
 				}
+				setSessionActive(true);
 				setUser(data.user);
 				setToken(data.token);
 				// Redirigir según el rol

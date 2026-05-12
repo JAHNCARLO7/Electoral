@@ -14,7 +14,7 @@ export const API_URL = process.env.EXPO_PUBLIC_API_URL || DEFAULT_API;
  * Redirige a login si recibe 401 (token expirado/inválido).
  */
 export function useAuthFetch() {
-  const { token, setToken, setUser, setLogoutMessage } = useUser();
+  const { token, setToken, setUser, setLogoutMessage, sessionActive, setSessionActive } = useUser();
 
   const authFetch = useCallback(
     async (url: string, options: RequestInit = {}, retries = 2): Promise<Response> => {
@@ -41,7 +41,11 @@ export function useAuthFetch() {
               if (body.error === 'USER_DELETED') msg = 'Tu usuario ha sido eliminado.';
               else if (body.error === 'SESSION_REPLACED') msg = 'Tu sesión fue iniciada en otro dispositivo.';
             } catch {}
-            setLogoutMessage(msg);
+            // Solo mostrar el mensaje si el usuario inició sesión en esta instancia de la app
+            if (sessionActive) {
+              setLogoutMessage(msg);
+            }
+            setSessionActive(false);
             setToken(null);
             setUser(null);
             router.replace('/Proyect/Login/login');
@@ -59,7 +63,7 @@ export function useAuthFetch() {
       }
       throw new Error('Error de red');
     },
-    [token, setToken, setUser, setLogoutMessage]
+    [token, setToken, setUser, setLogoutMessage, sessionActive, setSessionActive]
   );
 
   return authFetch;
