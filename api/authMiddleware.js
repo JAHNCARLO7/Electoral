@@ -74,11 +74,6 @@ async function authMiddleware(req, res, next) {
     if (deletedUserIds.has(decoded.id)) {
       return res.status(401).json({ error: 'USER_DELETED' });
     }
-    // Verificar sesión única (invalida tokens de otros dispositivos)
-    if (decoded.sid) {
-      const valid = await validateSession(decoded.id, decoded.sid);
-      if (!valid) return res.status(401).json({ error: 'SESSION_REPLACED' });
-    }
     req.user = decoded;
     next();
   } catch (e) {

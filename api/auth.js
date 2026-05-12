@@ -24,7 +24,7 @@ router.post('/login', async (req, res) => {
   }
   try {
     const [rows] = await pool.execute(
-      'SELECT id, nombre, usuario, password_hash, rol, activo FROM usuarios WHERE usuario = ? LIMIT 1',
+      'SELECT id, nombre, usuario, password_hash, rol, activo, session_token, ultimo_login FROM usuarios WHERE usuario = ? LIMIT 1',
       [usuario]
     );
     if (rows.length !== 1) {
@@ -38,6 +38,15 @@ router.post('/login', async (req, res) => {
     const match = await bcrypt.compare(password, user.password_hash);
     if (!match) {
       return res.status(401).json({ success: false, error: 'Credenciales incorrectas' });
+    }
+
+    // Bloquear segundo login si ya hay una sesión activa (heartbeat activo = último ping < 20s)
+    if (user.session_token && user.ultimo_login) {
+      const lastLogin = new Date(user.ultimo_login);
+      const twentySecondsAgo = new Date(Date.now() - 20 * 1000);
+      if (lastLogin > twentySecondsAgo) {
+        return res.status(409).json({ success: false, error: 'SESION_ACTIVA' });
+      }
     }
 
     // Generar session_token único — invalida cualquier sesión anterior
@@ -65,9 +74,24 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// GET /me — heartbeat para detectar sesiones eliminadas o reemplazadas
-router.get('/me', authMiddleware, (req, res) => {
+// GET /me — heartbeat: refresca ultimo_login para mantener la sesión marcada como activa
+router.get('/me', authMiddleware, async (req, res) => {
+  try {
+    await pool.execute('UPDATE usuarios SET ultimo_login = NOW() WHERE id = ?', [req.user.id]);
+  } catch { }
   res.json({ ok: true });
+});
+
+// POST /logout — libera la sesión activa del usuario
+router.post('/logout', authMiddleware, async (req, res) => {
+  try {
+    await pool.execute('UPDATE usuarios SET session_token = NULL WHERE id = ?', [req.user.id]);
+    invalidateSessionCache(req.user.id);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Logout error:', err);
+    res.status(500).json({ error: 'Error en el servidor' });
+  }
 });
 
 module.exports = router;

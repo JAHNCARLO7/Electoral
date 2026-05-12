@@ -16,7 +16,7 @@ function SessionHeartbeat() {
     if (!token) return;
     const interval = setInterval(() => {
       authFetch(API_URL + '/auth/me').catch(() => {});
-    }, 30_000);
+    }, 15_000);
     return () => clearInterval(interval);
   }, [token]);
 

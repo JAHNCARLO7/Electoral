@@ -56,6 +56,7 @@ import { API_URL } from '../../../hooks/useAuthFetch';
 				if (raw.includes('inactivo')) setErrorMsg('Tu cuenta ha sido desactivada. Contacta al administrador.');
 				else if (raw.includes('incorrectas') || raw.includes('incorrectos')) setErrorMsg('Usuario o contraseña incorrectos.');
 				else if (raw.includes('red') || raw.includes('fetch')) setErrorMsg('No se pudo conectar al servidor. Verifica tu conexión.');
+				else if (raw.includes('SESION_ACTIVA')) setErrorMsg('Este usuario ya tiene una sesión activa. Cierra la sesión en el otro dispositivo primero.');
 				else setErrorMsg(raw);
 			}
 		};

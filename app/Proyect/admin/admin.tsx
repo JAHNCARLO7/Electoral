@@ -40,7 +40,7 @@ type Movilizador = { id: number; nombre: string };
 type DeleteState = { visible: boolean; item: any; type: 'user' | 'ciudadano' | null };
 
 export default function AdminScreen() {
-  const { user, setUser, setToken } = useUser();
+  const { user, setUser, setToken, token } = useUser();
   const router = useRouter();
   const authFetch = useAuthFetch();
 
@@ -194,7 +194,8 @@ export default function AdminScreen() {
 
   useEffect(() => { fetchUsers(); fetchCiudadanos(); }, []);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try { await fetch(API_URL + '/auth/logout', { method: 'POST', headers: { Authorization: 'Bearer ' + token } }); } catch { }
     setToken(null);
     setUser(null);
     setTimeout(() => router.replace('/Proyect/Login/login'), 250);

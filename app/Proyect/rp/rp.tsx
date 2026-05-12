@@ -1,17 +1,17 @@
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
-  Animated,
-  Dimensions,
-  Platform,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Animated,
+    Dimensions,
+    Platform,
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { useUser } from '../../../context/UserContext';
 import { API_URL, useAuthFetch } from '../../../hooks/useAuthFetch';
@@ -229,7 +229,7 @@ const SparkBars = React.memo(({ values, color, height = 32 }: { values: number[]
 /* ---------- PANTALLA PRINCIPAL ---------- */
 
 export default function RPScreen() {
-  const { user, setUser, setToken } = useUser();
+  const { user, setUser, setToken, token } = useUser();
   const router = useRouter();
   const authFetch = useAuthFetch();
   const [movilizadores, setMovilizadores] = useState<Movilizador[]>([]);
@@ -283,11 +283,12 @@ export default function RPScreen() {
     return () => clearInterval(interval);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleLogout = useCallback(() => {
+  const handleLogout = useCallback(async () => {
+    try { await fetch(API_URL + '/auth/logout', { method: 'POST', headers: { Authorization: 'Bearer ' + token } }); } catch { }
     setToken(null);
     setUser(null);
     setTimeout(() => router.replace('/Proyect/Login/login'), 250);
-  }, []);
+  }, [token]);
 
   const stats = useMemo(() => {
     const activos = movilizadores.filter(m => m.estado === 'activo').length;

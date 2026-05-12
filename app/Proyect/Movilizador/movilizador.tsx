@@ -2,8 +2,8 @@ import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-    ActivityIndicator, Alert, Animated, Modal, Platform, RefreshControl,
-    ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View
+  ActivityIndicator, Alert, Animated, Modal, Platform, RefreshControl,
+  ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View
 } from 'react-native';
 import { useUser } from '../../../context/UserContext';
 import { API_URL, useAuthFetch } from '../../../hooks/useAuthFetch';
@@ -36,7 +36,14 @@ interface SeccionResumen {
 interface Ciudadano {
   id: number; nombre: string; paterno: string; materno: string;
   calle: string; no: string; colonia: string; seccion: string;
-  cel: string; visitas: number;
+  cel: string; visitas: number; ultima_visita: string | null;
+}
+
+const VISITA_COOLDOWN_MS = 30 * 60 * 1000; // 30 minutos
+function getMinutosRestantes(ultimaVisita: string | null): number {
+  if (!ultimaVisita) return 0;
+  const diff = Date.now() - new Date(ultimaVisita).getTime();
+  return diff < VISITA_COOLDOWN_MS ? Math.ceil((VISITA_COOLDOWN_MS - diff) / 60000) : 0;
 }
 
 /* ---------- COMPONENTE ANIMADO ---------- */
@@ -101,7 +108,18 @@ const MovilizadorScreen = () => {
       if (!res.ok) throw new Error('Error en la respuesta del servidor');
       const data = await res.json();
       if (Array.isArray(data)) {
-        setCiudadanosPorSeccion(prev => ({ ...prev, [seccion]: data }));
+        // Preservar ultima_visita local si el servidor devuelve null (evita perder el cooldown)
+        setCiudadanosPorSeccion(prev => {
+          const local = prev[seccion] || [];
+          const merged = data.map((c: Ciudadano) => {
+            const localC = local.find(l => l.id === c.id);
+            return {
+              ...c,
+              ultima_visita: c.ultima_visita ?? localC?.ultima_visita ?? null,
+            };
+          });
+          return { ...prev, [seccion]: merged };
+        });
       }
     } catch (err: any) {
       Alert.alert('Error', 'No se pudo cargar la sección.\n' + (err.message || err));
@@ -126,29 +144,46 @@ const MovilizadorScreen = () => {
     setRefreshing(false);
   }, [fetchSecciones, fetchCiudadanosSeccion, seccionSeleccionada]);
 
+  const [sendingVisita, setSendingVisita] = useState<Set<number>>(new Set());
+
   // Marcar visita: actualiza el estado local sin recargar todo
   const marcarVisita = useCallback(async (ciudadanoId: number, seccion: string) => {
+    if (sendingVisita.has(ciudadanoId)) return; // evitar doble clic
+    setSendingVisita(prev => new Set(prev).add(ciudadanoId));
     try {
       const res = await authFetch(`${API_URL}/movilizadores/visita/${ciudadanoId}`, { method: 'PUT' });
-      if (!res.ok) throw new Error('Error en la respuesta del servidor');
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        if (body.error === 'VISITA_RECIENTE') {
+          Alert.alert('Visita reciente', `Este ciudadano ya fue visitado. Espera ${body.minutosRestantes} min para registrar otra visita.`);
+        } else {
+          Alert.alert('Error', body.error || 'No se pudo registrar la visita.');
+        }
+        return;
+      }
+      const ahora = new Date().toISOString();
       // Actualizar estado local en lugar de recargar todo
       setCiudadanosPorSeccion(prev => {
         const lista = prev[seccion] || [];
+        const ciudadano = lista.find(c => c.id === ciudadanoId);
+        const eraNoVisitado = ciudadano?.visitas === 0;
+        // Actualizar resumen usando el valor correcto
+        setSecciones(s => s.map(sec =>
+          sec.seccion === seccion
+            ? { ...sec, visitados: sec.visitados + (eraNoVisitado ? 1 : 0) }
+            : sec
+        ));
         return {
           ...prev,
-          [seccion]: lista.map(c => c.id === ciudadanoId ? { ...c, visitas: c.visitas + 1 } : c),
+          [seccion]: lista.map(c => c.id === ciudadanoId ? { ...c, visitas: c.visitas + 1, ultima_visita: ahora } : c),
         };
       });
-      // Actualizar el resumen de la sección
-      setSecciones(prev => prev.map(s =>
-        s.seccion === seccion
-          ? { ...s, visitados: s.visitados + (ciudadanosPorSeccion[seccion]?.find(c => c.id === ciudadanoId)?.visitas === 0 ? 1 : 0) }
-          : s
-      ));
     } catch (err: any) {
       Alert.alert('Error', 'No se pudo registrar la visita.\n' + (err.message || err));
+    } finally {
+      setSendingVisita(prev => { const s = new Set(prev); s.delete(ciudadanoId); return s; });
     }
-  }, [authFetch, ciudadanosPorSeccion]);
+  }, [authFetch, sendingVisita]);
 
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>;
@@ -181,22 +216,23 @@ const MovilizadorScreen = () => {
   useEffect(() => {
     if (!user || !token) return;
     loadInitial();
-    const interval = setInterval(fetchSecciones, 30000);
+    const interval = setInterval(fetchSecciones, 15000);
     return () => clearInterval(interval);
   }, [user?.id, !!token]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Polling: refrescar ciudadanos de la sección abierta cada 30s
   useEffect(() => {
     if (!seccionSeleccionada) return;
-    const interval = setInterval(() => fetchCiudadanosSeccion(seccionSeleccionada), 30_000);
+    const interval = setInterval(() => fetchCiudadanosSeccion(seccionSeleccionada), 15_000);
     return () => clearInterval(interval);
   }, [seccionSeleccionada, fetchCiudadanosSeccion]);
 
-  const handleLogout = useCallback(() => {
+  const handleLogout = useCallback(async () => {
+    try { await fetch(API_URL + '/auth/logout', { method: 'POST', headers: { Authorization: 'Bearer ' + token } }); } catch { }
     setToken(null);
     setUser(null);
     setTimeout(() => router.replace('/Proyect/Login/login'), 250);
-  }, [setToken, setUser, router]);
+  }, [token, setToken, setUser, router]);
 
   const abrirSeccion = useCallback(async (seccion: string) => {
     setSeccionSeleccionada(seccion);
@@ -405,10 +441,17 @@ const MovilizadorScreen = () => {
                           </View>
                         </View>
                         <TouchableOpacity
-                          style={[st.visitBtn, item.visitas > 0 && { backgroundColor: C.primaryLight, borderColor: C.primary }]}
-                          onPress={() => marcarVisita(item.id, seccionSeleccionada!)} activeOpacity={0.7}>
+                          style={[st.visitBtn,
+                            item.visitas > 0 && { backgroundColor: C.primaryLight, borderColor: C.primary },
+                            (sendingVisita.has(item.id) || getMinutosRestantes(item.ultima_visita) > 0) && { opacity: 0.5 }
+                          ]}
+                          onPress={() => marcarVisita(item.id, seccionSeleccionada!)}
+                          disabled={sendingVisita.has(item.id) || getMinutosRestantes(item.ultima_visita) > 0}
+                          activeOpacity={0.7}>
                           <Text style={[st.visitBtnText, item.visitas > 0 && { color: C.primary }]}>
-                            {item.visitas > 0 ? 'Registrar otra visita' : 'Marcar visita'}
+                            {getMinutosRestantes(item.ultima_visita) > 0
+                              ? `Espera ${getMinutosRestantes(item.ultima_visita)} min`
+                              : item.visitas > 0 ? 'Registrar otra visita' : 'Marcar visita'}
                           </Text>
                         </TouchableOpacity>
                       </View>

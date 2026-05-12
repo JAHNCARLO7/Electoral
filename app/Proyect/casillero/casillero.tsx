@@ -47,7 +47,7 @@ const FadeIn = React.memo(({ delay = 0, children }: { delay?: number; children: 
 });
 
 export default function CasilleroScreen() {
-  const { user, setUser, setToken } = useUser();
+  const { user, setUser, setToken, token } = useUser();
   const router = useRouter();
   const authFetch = useAuthFetch();
 
@@ -65,7 +65,8 @@ export default function CasilleroScreen() {
   const [cargando, setCargando] = useState(false);
   const [votosRegistrados, setVotosRegistrados] = useState(0);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try { await fetch(API_BASE + '/auth/logout', { method: 'POST', headers: { Authorization: 'Bearer ' + token } }); } catch { }
     setToken(null);
     setUser(null);
     setTimeout(() => router.replace('/Proyect/Login/login'), 250);
@@ -124,7 +125,7 @@ export default function CasilleroScreen() {
   // Polling: refrescar ciudadanos de la sección activa cada 30s
   useEffect(() => {
     if (!seccionSeleccionada) return;
-    const interval = setInterval(() => silentRefreshCiudadanos(seccionSeleccionada), 30_000);
+    const interval = setInterval(() => silentRefreshCiudadanos(seccionSeleccionada), 15_000);
     return () => clearInterval(interval);
   }, [seccionSeleccionada, silentRefreshCiudadanos]);
 
@@ -141,14 +142,20 @@ export default function CasilleroScreen() {
     if (!ciudadanoAVotar) return;
     try {
       await authFetch(API_URL + '/votar/' + ciudadanoAVotar.id, { method: 'PUT' });
+      const votadoId = ciudadanoAVotar.id;
       setModalVisible(false);
-      const nueva = ciudadanos.filter(c => c.id !== ciudadanoAVotar.id);
-      setCiudadanos(nueva);
-      setCiudadanosFiltrados(nueva.filter(c =>
-        (c.nombre + ' ' + c.paterno + ' ' + c.materno).toLowerCase().includes(busquedaCiudadano.toLowerCase())
-      ));
-      setVotosRegistrados(v => v + 1);
       setCiudadanoAVotar(null);
+      // Esperar a que el Modal termine de desmontarse antes de modificar la lista
+      setTimeout(() => {
+        setCiudadanos(prev => {
+          const nueva = prev.filter(c => c.id !== votadoId);
+          setCiudadanosFiltrados(nueva.filter(c =>
+            (c.nombre + ' ' + c.paterno + ' ' + c.materno).toLowerCase().includes(busquedaRef.current.toLowerCase())
+          ));
+          return nueva;
+        });
+        setVotosRegistrados(v => v + 1);
+      }, 300);
     } catch { }
   };
 

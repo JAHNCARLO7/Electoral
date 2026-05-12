@@ -42,10 +42,13 @@ router.get('/ciudadanos-seccion/:seccion', requireRole('movilizador', 'admin'), 
       return res.status(400).json({ error: 'Sección inválida' });
     }
     const [rows] = await db.execute(
-      `SELECT id, nombre, paterno, materno, calle, no, colonia, seccion, cel, visitas
-       FROM ciudadanos
-       WHERE seccion = ? AND status_voto = 'pendiente' AND deleted = 0
-       ORDER BY paterno, materno, nombre`,
+      `SELECT c.id, c.nombre, c.paterno, c.materno, c.calle, c.no, c.colonia, c.seccion, c.cel, c.visitas,
+              MAX(vl.created_at) AS ultima_visita
+       FROM ciudadanos c
+       LEFT JOIN visitas_log vl ON vl.ciudadano_id = c.id
+       WHERE c.seccion = ? AND c.status_voto = 'pendiente' AND c.deleted = 0
+       GROUP BY c.id
+       ORDER BY c.paterno, c.materno, c.nombre`,
       [seccion]
     );
     res.json(rows);
@@ -109,8 +112,7 @@ router.put('/visita/:ciudadanoId', requireRole('movilizador', 'admin'), async (r
     const ciudadanoId = parseId(req.params.ciudadanoId);
     if (!ciudadanoId) return res.status(400).json({ error: 'ID inválido' });
 
-    // Ya no se verifica que el ciudadano pertenezca al movilizador actual
-    // Solo se verifica que exista y esté pendiente
+    // Verificar que el ciudadano exista y esté pendiente
     if (req.user.rol === 'movilizador') {
       const [check] = await db.execute(
         'SELECT id FROM ciudadanos WHERE id = ? AND status_voto = "pendiente" AND deleted = 0',
@@ -118,6 +120,19 @@ router.put('/visita/:ciudadanoId', requireRole('movilizador', 'admin'), async (r
       );
       if (check.length === 0) {
         return res.status(403).json({ error: 'Este ciudadano no está disponible para visita' });
+      }
+    }
+
+    // Bloquear si ya se registró una visita en los últimos 30 minutos
+    const [recent] = await db.execute(
+      'SELECT created_at FROM visitas_log WHERE ciudadano_id = ? ORDER BY created_at DESC LIMIT 1',
+      [ciudadanoId]
+    );
+    if (recent.length > 0) {
+      const diff = Date.now() - new Date(recent[0].created_at).getTime();
+      if (diff < 30 * 60 * 1000) {
+        const minutosRestantes = Math.ceil((30 * 60 * 1000 - diff) / 60000);
+        return res.status(429).json({ error: 'VISITA_RECIENTE', minutosRestantes });
       }
     }
 
