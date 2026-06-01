@@ -42,7 +42,8 @@ export function useAuthFetch() {
               else if (body.error === 'SESSION_REPLACED') msg = 'Tu sesión fue iniciada en otro dispositivo.';
             } catch {}
             // Solo mostrar el mensaje si el usuario inició sesión en esta instancia de la app
-            if (sessionActive) {
+            // Y si aún hay token (no estamos en logout)
+            if (sessionActive && token) {
               setLogoutMessage(msg);
             }
             setSessionActive(false);

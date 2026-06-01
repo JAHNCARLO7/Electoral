@@ -60,9 +60,11 @@ const FadeIn = React.memo(({ delay = 0, children }: { delay?: number; children: 
 });
 
 const MovilizadorScreen = () => {
-  const { user, setUser, setToken, token } = useUser();
+  const { user, setUser, setToken, token, setSessionActive } = useUser();
   const router = useRouter();
   const authFetch = useAuthFetch();
+  const isMountedRef = useRef(true);
+  const logoutRequestedRef = useRef(false);
 
   // Resumen de secciones (carga inicial, ligera)
   const [secciones, setSecciones] = useState<SeccionResumen[]>([]);
@@ -77,6 +79,11 @@ const MovilizadorScreen = () => {
   const [seccionSeleccionada, setSeccionSeleccionada] = useState<string | null>(null);
   const [modalSeccion, setModalSeccion] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => { isMountedRef.current = false; };
+  }, []);
 
   // Totales calculados desde los resúmenes de sección
   const totalVisitados = useMemo(() => secciones.reduce((a, s) => a + Number(s.visitados), 0), [secciones]);
@@ -125,6 +132,7 @@ const MovilizadorScreen = () => {
         });
       }
     } catch (err: any) {
+      if (!isMountedRef.current || logoutRequestedRef.current) return;
       Alert.alert('Error', 'No se pudo cargar la sección.\n' + (err.message || err));
     }
     setLoadingSeccion(null);
@@ -182,6 +190,7 @@ const MovilizadorScreen = () => {
         };
       });
     } catch (err: any) {
+      if (!isMountedRef.current || logoutRequestedRef.current) return;
       Alert.alert('Error', 'No se pudo registrar la visita.\n' + (err.message || err));
     } finally {
       setSendingVisita(prev => { const s = new Set(prev); s.delete(ciudadanoId); return s; });
@@ -231,11 +240,17 @@ const MovilizadorScreen = () => {
   }, [seccionSeleccionada, fetchCiudadanosSeccion]);
 
   const handleLogout = useCallback(async () => {
-    try { await fetch(API_URL + '/auth/logout', { method: 'POST', headers: { Authorization: 'Bearer ' + token } }); } catch { }
+    logoutRequestedRef.current = true;
+    setSessionActive(false);
     setToken(null);
     setUser(null);
-    setTimeout(() => router.replace('/Proyect/Login/login'), 250);
-  }, [token, setToken, setUser, router]);
+    try {
+      await fetch(API_URL + '/auth/logout', { method: 'POST', headers: { Authorization: 'Bearer ' + token } });
+    } catch { }
+    // Espera breve para que useAuthFetch vea logoutRequestedRef y no muestre alertas
+    await new Promise(r => setTimeout(r, 100));
+    router.replace('/Proyect/Login/login');
+  }, [token, setToken, setUser, setSessionActive, router]);
 
   const abrirSeccion = useCallback(async (seccion: string) => {
     setSeccionSeleccionada(seccion);
