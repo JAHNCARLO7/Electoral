@@ -10,6 +10,14 @@ function parseId(val) {
   return (!isNaN(id) && id > 0) ? id : null;
 }
 
+// Helper: secciones pueden incluir espacios y caracteres de texto seguros
+function validSeccion(val) {
+  if (typeof val !== 'string') return false;
+  const trimmed = val.trim();
+  if (!trimmed || trimmed.length > 50) return false;
+  return !trimmed.includes('/') && !trimmed.includes('\0');
+}
+
 // Cache para estado de movilizadores (query pesada con subqueries)
 let estadoCache = { data: null, ts: 0 };
 const ESTADO_CACHE_TTL = 15_000; // 15 segundos
@@ -17,13 +25,14 @@ const ESTADO_CACHE_TTL = 15_000; // 15 segundos
 // Resumen de secciones para el movilizador (reemplaza la carga masiva de todos los ciudadanos)
 router.get('/secciones-resumen', requireRole('movilizador', 'admin'), async (req, res) => {
   try {
+    const whereClauses = ['status_voto = \'pendiente\'', 'deleted = 0'];
     const [rows] = await db.query(`
       SELECT
         seccion,
         COUNT(*) AS total,
         SUM(CASE WHEN visitas > 0 THEN 1 ELSE 0 END) AS visitados
       FROM ciudadanos
-      WHERE status_voto = 'pendiente' AND deleted = 0
+      WHERE ${whereClauses.join(' AND ')}
       GROUP BY seccion
       ORDER BY seccion
     `);
@@ -38,18 +47,20 @@ router.get('/secciones-resumen', requireRole('movilizador', 'admin'), async (req
 router.get('/ciudadanos-seccion/:seccion', requireRole('movilizador', 'admin'), async (req, res) => {
   try {
     const seccion = (req.params.seccion || '').trim();
-    if (!seccion || !/^[A-Za-z0-9\-]{1,20}$/.test(seccion)) {
+    if (!validSeccion(seccion)) {
       return res.status(400).json({ error: 'Sección inválida' });
     }
+    const whereClauses = ['c.seccion = ?', 'c.status_voto = \'pendiente\'', 'c.deleted = 0'];
+    const params = [seccion];
     const [rows] = await db.execute(
       `SELECT c.id, c.nombre, c.paterno, c.materno, c.calle, c.no, c.colonia, c.seccion, c.cel, c.visitas,
-              MAX(vl.created_at) AS ultima_visita
+              MAX(vl.timestamp) AS ultima_visita
        FROM ciudadanos c
        LEFT JOIN visitas_log vl ON vl.ciudadano_id = c.id
-       WHERE c.seccion = ? AND c.status_voto = 'pendiente' AND c.deleted = 0
+       WHERE ${whereClauses.join(' AND ')}
        GROUP BY c.id
        ORDER BY c.paterno, c.materno, c.nombre`,
-      [seccion]
+      params
     );
     res.json(rows);
   } catch (error) {
@@ -125,11 +136,11 @@ router.put('/visita/:ciudadanoId', requireRole('movilizador', 'admin'), async (r
 
     // Bloquear si ya se registró una visita en los últimos 30 minutos
     const [recent] = await db.execute(
-      'SELECT created_at FROM visitas_log WHERE ciudadano_id = ? ORDER BY created_at DESC LIMIT 1',
+      'SELECT timestamp FROM visitas_log WHERE ciudadano_id = ? ORDER BY timestamp DESC LIMIT 1',
       [ciudadanoId]
     );
     if (recent.length > 0) {
-      const diff = Date.now() - new Date(recent[0].created_at).getTime();
+      const diff = Date.now() - new Date(recent[0].timestamp).getTime();
       if (diff < 30 * 60 * 1000) {
         const minutosRestantes = Math.ceil((30 * 60 * 1000 - diff) / 60000);
         return res.status(429).json({ error: 'VISITA_RECIENTE', minutosRestantes });

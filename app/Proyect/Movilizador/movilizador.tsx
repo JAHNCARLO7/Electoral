@@ -2,8 +2,8 @@ import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator, Alert, Animated, Modal, Platform, RefreshControl,
-  ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View
+    ActivityIndicator, Alert, Animated, Platform, RefreshControl,
+    ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View
 } from 'react-native';
 import { useUser } from '../../../context/UserContext';
 import { API_URL, useAuthFetch } from '../../../hooks/useAuthFetch';
@@ -104,8 +104,11 @@ const MovilizadorScreen = () => {
   const fetchCiudadanosSeccion = useCallback(async (seccion: string) => {
     setLoadingSeccion(seccion);
     try {
-      const res = await authFetch(`${API_URL}/movilizadores/ciudadanos-seccion/${seccion}`);
-      if (!res.ok) throw new Error('Error en la respuesta del servidor');
+      const res = await authFetch(`${API_URL}/movilizadores/ciudadanos-seccion/${encodeURIComponent(seccion)}`);
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body?.error || `Error en la respuesta del servidor (${res.status})`);
+      }
       const data = await res.json();
       if (Array.isArray(data)) {
         // Preservar ultima_visita local si el servidor devuelve null (evita perder el cooldown)
@@ -257,31 +260,22 @@ const MovilizadorScreen = () => {
   return (
     <View style={st.container}>
       {/* MODAL CONFIRMACIÓN SECCIÓN */}
-      <Modal
-        visible={!!modalSeccion}
-        transparent
-        
-        animationType="fade"
-        onRequestClose={() => setModalSeccion(null)}
-      >
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'center', alignItems: 'center' }}>
-          <View style={{ backgroundColor: C.white, borderRadius: 16, padding: 28, width: '80%', alignItems: 'center', elevation: 8 }}>
-            <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 10, color: C.primary }}>Confirmar acceso</Text>
-            <Text style={{ fontSize: 15, color: C.textPrimary, textAlign: 'center', marginBottom: 18 }}>
-              ¿Estás seguro de ingresar a la sección {modalSeccion}?
-             
-            </Text>
-            <View style={{ flexDirection: 'row', gap: 18 }}>
-              <TouchableOpacity style={{ paddingVertical: 10, paddingHorizontal: 18, borderRadius: 8, backgroundColor: C.errorLight, borderWidth: 1, borderColor: C.error }} onPress={() => setModalSeccion(null)}>
-                <Text style={{ color: C.error, fontWeight: 'bold' }}>Cancelar</Text>
+      {modalSeccion ? (
+        <View style={st.modalOverlay}>
+          <View style={st.modalCard}>
+            <Text style={st.modalTitle}>Confirmar acceso</Text>
+            <Text style={st.modalText}>¿Estás seguro de ingresar a la sección {modalSeccion}?</Text>
+            <View style={st.modalActions}>
+              <TouchableOpacity style={st.modalCancel} onPress={() => setModalSeccion(null)}>
+                <Text style={st.modalCancelText}>Cancelar</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={{ paddingVertical: 10, paddingHorizontal: 18, borderRadius: 8, backgroundColor: C.primary }} onPress={() => modalSeccion && abrirSeccion(modalSeccion)}>
-                <Text style={{ color: C.white, fontWeight: 'bold' }}>Ingresar</Text>
+              <TouchableOpacity style={st.modalConfirm} onPress={() => modalSeccion && abrirSeccion(modalSeccion)}>
+                <Text style={st.modalConfirmText}>Ingresar</Text>
               </TouchableOpacity>
             </View>
           </View>
         </View>
-      </Modal>
+      ) : null}
 
       {/* HEADER */}
       <View style={st.header}>
@@ -515,6 +509,26 @@ const st = StyleSheet.create({
     backgroundColor: C.white, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12,
     fontSize: 14, color: C.textPrimary, borderWidth: 1, borderColor: C.cardBorder, marginBottom: 14,
   },
+
+  modalOverlay: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'center', alignItems: 'center', zIndex: 99,
+  },
+  modalCard: {
+    backgroundColor: C.white, borderRadius: 16, padding: 28, width: '85%', maxWidth: 420, alignItems: 'center', elevation: 8,
+  },
+  modalTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 10, color: C.primary },
+  modalText: { fontSize: 15, color: C.textPrimary, textAlign: 'center', marginBottom: 18 },
+  modalActions: { flexDirection: 'row', justifyContent: 'center', gap: 14 },
+  modalCancel: {
+    paddingVertical: 10, paddingHorizontal: 18, borderRadius: 8, backgroundColor: C.errorLight,
+    borderWidth: 1, borderColor: C.error,
+  },
+  modalCancelText: { color: C.error, fontWeight: 'bold' },
+  modalConfirm: {
+    paddingVertical: 10, paddingHorizontal: 18, borderRadius: 8, backgroundColor: C.primary,
+  },
+  modalConfirmText: { color: C.white, fontWeight: 'bold' },
 
   secCard: {
     backgroundColor: C.white, borderRadius: 14, padding: 16, marginBottom: 10,

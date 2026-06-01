@@ -9,9 +9,12 @@ function parseId(val) {
   return (!isNaN(id) && id > 0) ? id : null;
 }
 
-// Helper: validar que sección sea alfanumérico (prevenir inyección)
+// Helper: validar que sección sea segura y permita espacios
 function validSeccion(val) {
-  return typeof val === 'string' && /^[A-Za-z0-9\-]{1,20}$/.test(val.trim());
+  if (typeof val !== 'string') return false;
+  const trimmed = val.trim();
+  if (!trimmed || trimmed.length > 50) return false;
+  return !trimmed.includes('/') && !trimmed.includes('\0');
 }
 
 // Cache simple para estadísticas pesadas (50K filas con GROUP BY)

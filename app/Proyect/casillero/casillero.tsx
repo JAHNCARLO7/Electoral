@@ -72,17 +72,27 @@ export default function CasilleroScreen() {
     setTimeout(() => router.replace('/Proyect/Login/login'), 250);
   };
 
-  useEffect(() => { cargarSecciones(); }, []);
+  useEffect(() => {
+    if (!token) return;
+    cargarSecciones();
+  }, [token]);
 
   const cargarSecciones = async () => {
     setCargando(true);
     try {
       const res = await authFetch(API_URL + '/secciones');
+      if (!res.ok) {
+        console.warn('Error al cargar secciones:', res.status);
+        return;
+      }
       const data: Seccion[] = await res.json();
       setSecciones(data);
       setSeccionesFiltradas(data);
-    } catch { }
-    setCargando(false);
+    } catch (err) {
+      console.warn('Error en cargarSecciones:', err);
+    } finally {
+      setCargando(false);
+    }
   };
 
   const buscarSeccion = (texto: string) => {
@@ -95,12 +105,23 @@ export default function CasilleroScreen() {
     setSeccionSeleccionada(seccion);
     setBusquedaCiudadano('');
     try {
-      const res = await authFetch(API_URL + '/seccion/' + seccion);
+      const res = await authFetch(API_URL + '/seccion/' + encodeURIComponent(seccion));
+      if (!res.ok) {
+        console.warn('Error al cargar ciudadanos:', res.status);
+        setCiudadanos([]);
+        setCiudadanosFiltrados([]);
+        return;
+      }
       const data: Ciudadano[] = await res.json();
       setCiudadanos(data);
       setCiudadanosFiltrados(data);
-    } catch { }
-    setCargando(false);
+    } catch (err) {
+      console.warn('Error en cargarCiudadanos:', err);
+      setCiudadanos([]);
+      setCiudadanosFiltrados([]);
+    } finally {
+      setCargando(false);
+    }
   };
 
   // Refresh silencioso: no muestra spinner ni resetea búsqueda
@@ -109,7 +130,7 @@ export default function CasilleroScreen() {
 
   const silentRefreshCiudadanos = useCallback(async (seccion: string) => {
     try {
-      const res = await authFetch(API_URL + '/seccion/' + seccion);
+      const res = await authFetch(API_URL + '/seccion/' + encodeURIComponent(seccion));
       if (!res.ok) return;
       const data: Ciudadano[] = await res.json();
       setCiudadanos(data);
