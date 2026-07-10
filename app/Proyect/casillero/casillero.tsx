@@ -1,15 +1,14 @@
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator, Animated, FlatList, Modal, Platform,
-  StyleSheet, Text, TextInput, TouchableOpacity, View,
+    ActivityIndicator, Animated, FlatList, Modal, Platform,
+    StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import { useUser } from '../../../context/UserContext';
 import { API_URL as API_BASE, useAuthFetch } from '../../../hooks/useAuthFetch';
 
 const API_URL = API_BASE + '/ciudadanos';
 
-/* ---------- PALETA CORPORATIVA ---------- */
 const C = {
   primary: '#1565C0',
   primaryDark: '#0D47A1',

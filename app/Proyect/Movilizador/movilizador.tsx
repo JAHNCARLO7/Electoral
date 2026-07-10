@@ -2,8 +2,8 @@ import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-    ActivityIndicator, Alert, Animated, Platform, RefreshControl,
-    ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View
+  ActivityIndicator, Alert, Animated, Platform, RefreshControl,
+  ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View
 } from 'react-native';
 import { useUser } from '../../../context/UserContext';
 import { API_URL, useAuthFetch } from '../../../hooks/useAuthFetch';
@@ -82,7 +82,11 @@ const MovilizadorScreen = () => {
 
   useEffect(() => {
     isMountedRef.current = true;
-    return () => { isMountedRef.current = false; };
+    logoutRequestedRef.current = false;
+    return () => {
+      isMountedRef.current = false;
+      logoutRequestedRef.current = true;
+    };
   }, []);
 
   // Totales calculados desde los resúmenes de sección
@@ -240,16 +244,18 @@ const MovilizadorScreen = () => {
   }, [seccionSeleccionada, fetchCiudadanosSeccion]);
 
   const handleLogout = useCallback(async () => {
+    if (logoutRequestedRef.current) return;
     logoutRequestedRef.current = true;
+    isMountedRef.current = false;
+
+    router.replace('/Proyect/Login/login');
     setSessionActive(false);
     setToken(null);
     setUser(null);
+
     try {
       await fetch(API_URL + '/auth/logout', { method: 'POST', headers: { Authorization: 'Bearer ' + token } });
     } catch { }
-    // Espera breve para que useAuthFetch vea logoutRequestedRef y no muestre alertas
-    await new Promise(r => setTimeout(r, 100));
-    router.replace('/Proyect/Login/login');
   }, [token, setToken, setUser, setSessionActive, router]);
 
   const abrirSeccion = useCallback(async (seccion: string) => {
@@ -261,36 +267,33 @@ const MovilizadorScreen = () => {
     }
   }, [ciudadanosPorSeccion, fetchCiudadanosSeccion]);
 
-  if (loading) return (
-    <View style={{ flex: 1, backgroundColor: C.bg, justifyContent: 'center', alignItems: 'center' }}>
-      <ActivityIndicator size="large" color={C.primary} />
-      <Text style={{ color: C.textSecondary, marginTop: 14, fontSize: 14, fontWeight: '600' }}>Cargando ciudadanos...</Text>
-    </View>
-  );
-
   const seccionesFiltradas = secciones
     .filter(s => s.seccion.includes(busquedaSeccion.trim()))
     .sort((a, b) => a.seccion.localeCompare(b.seccion));
+  const seccionActual = seccionSeleccionada ?? '';
 
   return (
     <View style={st.container}>
+      <View style={[st.loadingOverlay, !loading && st.loadingHidden]}>
+        <ActivityIndicator size="large" color={C.primary} />
+        <Text style={st.loadingText}>Cargando ciudadanos...</Text>
+      </View>
+
       {/* MODAL CONFIRMACIÓN SECCIÓN */}
-      {modalSeccion ? (
-        <View style={st.modalOverlay}>
-          <View style={st.modalCard}>
-            <Text style={st.modalTitle}>Confirmar acceso</Text>
-            <Text style={st.modalText}>¿Estás seguro de ingresar a la sección {modalSeccion}?</Text>
-            <View style={st.modalActions}>
-              <TouchableOpacity style={st.modalCancel} onPress={() => setModalSeccion(null)}>
-                <Text style={st.modalCancelText}>Cancelar</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={st.modalConfirm} onPress={() => modalSeccion && abrirSeccion(modalSeccion)}>
-                <Text style={st.modalConfirmText}>Ingresar</Text>
-              </TouchableOpacity>
-            </View>
+      <View style={[st.modalOverlay, !modalSeccion && st.modalHidden]} pointerEvents={modalSeccion ? 'auto' : 'none'}>
+        <View style={st.modalCard}>
+          <Text style={st.modalTitle}>Confirmar acceso</Text>
+          <Text style={st.modalText}>¿Estás seguro de ingresar a la sección {modalSeccion}?</Text>
+          <View style={st.modalActions}>
+            <TouchableOpacity style={st.modalCancel} onPress={() => setModalSeccion(null)}>
+              <Text style={st.modalCancelText}>Cancelar</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={st.modalConfirm} onPress={() => modalSeccion && abrirSeccion(modalSeccion)}>
+              <Text style={st.modalConfirmText}>Ingresar</Text>
+            </TouchableOpacity>
           </View>
         </View>
-      ) : null}
+      </View>
 
       {/* HEADER */}
       <View style={st.header}>
@@ -318,8 +321,7 @@ const MovilizadorScreen = () => {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.primary} colors={[C.primary]} />}
         showsVerticalScrollIndicator={false}>
 
-        {!seccionSeleccionada ? (
-          <>
+        <View style={[st.contentPane, !!seccionSeleccionada && st.hidden]}>
             {/* KPI RESUMEN */}
             <View style={st.kpiRow}>
               <View style={[st.kpiCard, { backgroundColor: C.primaryLight }]}>
@@ -385,31 +387,30 @@ const MovilizadorScreen = () => {
                 );
               })
             )}
-          </>
-        ) : (
-          <>
+        </View>
+        <View style={[st.contentPane, !seccionSeleccionada && st.hidden]}>
             {/* DETALLE SECCION */}
             <TouchableOpacity style={st.backBtn} onPress={() => setSeccionSeleccionada(null)} activeOpacity={0.7}>
               <Text style={st.backBtnText}>← Regresar a secciones</Text>
             </TouchableOpacity>
 
             {(() => {
-              const resumen = secciones.find(s => s.seccion === seccionSeleccionada);
-              const lista = ciudadanosPorSeccion[seccionSeleccionada] || [];
-              const visitadosLocal = lista.filter(c => c.visitas > 0).length;
+              const resumen = secciones.find(s => s.seccion === seccionActual);
+              const lista = seccionActual ? (ciudadanosPorSeccion[seccionActual] || []) : [];
+              const visitadosLocal = lista.filter((c: Ciudadano) => c.visitas > 0).length;
               return (
                 <View style={st.secDetailHeader}>
-                  <Text style={st.secDetailTitle}>Sección {seccionSeleccionada}</Text>
+                  <Text style={st.secDetailTitle}>Sección {seccionActual}</Text>
                   <View style={st.secDetailBadge}>
                     <Text style={st.secDetailBadgeText}>
-                      {loadingSeccion === seccionSeleccionada ? '...' : `${visitadosLocal}/${resumen?.total ?? lista.length}`}
+                      {loadingSeccion === seccionActual ? '...' : `${visitadosLocal}/${resumen?.total ?? lista.length}`}
                     </Text>
                   </View>
                 </View>
               );
             })()}
 
-            {loadingSeccion === seccionSeleccionada ? (
+            {loadingSeccion === seccionActual ? (
               <View style={{ padding: 40, alignItems: 'center' }}>
                 <ActivityIndicator size="large" color={C.primary} />
                 <Text style={{ color: C.textSecondary, marginTop: 12, fontWeight: '600' }}>Cargando ciudadanos...</Text>
@@ -417,17 +418,17 @@ const MovilizadorScreen = () => {
             ) : (
               <>
                 <TextInput style={st.searchInput} placeholder="Buscar nombre..." placeholderTextColor={C.textTertiary}
-                  value={busquedaNombre[seccionSeleccionada] || ''}
-                  onChangeText={txt => setBusquedaNombre(prev => ({ ...prev, [seccionSeleccionada!]: txt }))} />
+                  value={busquedaNombre[seccionActual] || ''}
+                  onChangeText={txt => setBusquedaNombre(prev => ({ ...prev, [seccionActual]: txt }))} />
 
                 {(() => {
-                  const lista = ciudadanosPorSeccion[seccionSeleccionada] || [];
-                  const filtro = busquedaNombre[seccionSeleccionada] || '';
+                  const lista = seccionActual ? (ciudadanosPorSeccion[seccionActual] || []) : [];
+                  const filtro = busquedaNombre[seccionActual] || '';
                   const filtrada = filtro
-                    ? lista.filter(c => `${c.nombre} ${c.paterno} ${c.materno}`.toLowerCase().includes(filtro.toLowerCase()))
+                    ? lista.filter((c: Ciudadano) => `${c.nombre} ${c.paterno} ${c.materno}`.toLowerCase().includes(filtro.toLowerCase()))
                     : lista;
                   if (filtrada.length === 0) return <Text style={st.emptyText}>Sin resultados</Text>;
-                  return filtrada.map((item, i) => (
+                  return filtrada.map((item: Ciudadano, i: number) => (
                     <FadeIn key={item.id} delay={i * 40}>
                       <View style={st.citizenCard}>
                         <View style={st.citizenRow}>
@@ -454,7 +455,7 @@ const MovilizadorScreen = () => {
                             item.visitas > 0 && { backgroundColor: C.primaryLight, borderColor: C.primary },
                             (sendingVisita.has(item.id) || getMinutosRestantes(item.ultima_visita) > 0) && { opacity: 0.5 }
                           ]}
-                          onPress={() => marcarVisita(item.id, seccionSeleccionada!)}
+                          onPress={() => marcarVisita(item.id, seccionActual)}
                           disabled={sendingVisita.has(item.id) || getMinutosRestantes(item.ultima_visita) > 0}
                           activeOpacity={0.7}>
                           <Text style={[st.visitBtnText, item.visitas > 0 && { color: C.primary }]}>
@@ -469,8 +470,7 @@ const MovilizadorScreen = () => {
                 })()}
               </>
             )}
-          </>
-        )}
+        </View>
         <View style={{ height: 30 }} />
       </ScrollView>
     </View>
@@ -525,10 +525,19 @@ const st = StyleSheet.create({
     fontSize: 14, color: C.textPrimary, borderWidth: 1, borderColor: C.cardBorder, marginBottom: 14,
   },
 
+  loadingOverlay: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: C.bg, justifyContent: 'center', alignItems: 'center', zIndex: 110,
+  },
+  loadingHidden: { display: 'none' },
+  loadingText: { color: C.textSecondary, marginTop: 14, fontSize: 14, fontWeight: '600' },
+  contentPane: { width: '100%' },
+  hidden: { display: 'none' },
   modalOverlay: {
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
     backgroundColor: 'rgba(0,0,0,0.35)', justifyContent: 'center', alignItems: 'center', zIndex: 99,
   },
+  modalHidden: { display: 'none' },
   modalCard: {
     backgroundColor: C.white, borderRadius: 16, padding: 28, width: '85%', maxWidth: 420, alignItems: 'center', elevation: 8,
   },
